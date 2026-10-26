@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Náufrago · La Ciencia de Sobrevivir</title>
+  <meta name="description" content="Videojuego educativo: sobrevive en una isla usando química, física y biología. Escáner atómico, control por voz y micrófono, clima real y ranking en la nube.">
+  <meta name="theme-color" content="#0f1417">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f1417'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%2300e5ff' stroke-width='4'/%3E%3Cpath d='M32 8 L37 32 L32 56 L27 32 Z' fill='%2300e5ff'/%3E%3Cpath d='M8 32 L32 27 L56 32 L32 37 Z' fill='%23e5c384'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="marco">
+<div id="stage">
+
+  <!-- ============================== MENÚ ============================== -->
+  <section id="pantalla-menu" class="pantalla activa">
+    <div class="fondo" style="background-image:url(assets/img/menu.jpg)"></div>
+    <div class="menu-sombra"></div>
+    <header class="menu-top">
+      <img src="assets/img/logo.png" alt="Náufrago · La ciencia de sobrevivir" class="logo">
+      <span class="chip" id="chip-clima-menu">☁️ Consultando el clima real…</span>
+    </header>
+    <div class="menu-izq">
+      <p class="eyebrow">— Expedición científica · Feria de la Ciencia 2026</p>
+      <h1 class="titulo">NÁUFRAGO<span>LA CIENCIA DE SOBREVIVIR</span></h1>
+      <p class="lead">Sobrevive al naufragio del buque Aurora usando la química, la física y la biología. BRISA escanea cada objeto que encuentras, te muestra sus átomos y te explica para qué sirve.</p>
+      <div class="menu-botones">
+        <button class="btn btn-primario btn-grande" id="btn-jugar">▶ INICIAR AVENTURA <small>Capítulo 1 · La costa de los despojos</small></button>
+        <div class="fila">
+          <button class="btn" id="btn-como">❓ CÓMO SE JUEGA</button>
+          <button class="btn" id="btn-pantalla">⛶ PANTALLA COMPLETA [F]</button>
+        </div>
+      </div>
+    </div>
+    <aside class="panel menu-ranking">
+      <p class="eyebrow">🏆 Salón de la fama</p>
+      <h2>RÉCORDS DE LA FERIA</h2>
+      <p class="sub" id="ranking-estado-menu">Conectando con la nube…</p>
+      <ol class="ranking" id="ranking-menu"></ol>
+      <p class="reto">Rector, profesores: ¿creen que pueden superar al mejor estudiante?</p>
+    </aside>
+    <footer class="creditos">Autor: <b>Luis Alejandro Mendoza Camacho</b> · Grado 10-01 · Colegio Carlos Vicente Rey</footer>
+  </section>
+
+  <!-- ============================ CINEMÁTICA ============================ -->
+  <section id="pantalla-cine" class="pantalla">
+    <div class="cine-capa" id="cine-a"></div>
+    <div class="cine-capa" id="cine-b"></div>
+    <div class="cine-franja arriba"></div>
+    <div class="cine-franja abajo"></div>
+    <p class="cine-subtitulo" id="cine-texto"></p>
+    <button class="btn btn-mini cine-saltar" id="btn-saltar">Saltar ▸ [Enter]</button>
+  </section>
+
+  <!-- ============================= SENSORES ============================= -->
+  <section id="pantalla-sensores" class="pantalla">
+    <div class="fondo fondo-oscuro" style="background-image:url(assets/img/cine_brisa.jpg)"></div>
+    <div class="sens-contenido">
+      <p class="eyebrow">— Protocolo BRISA · Calibración de sensores</p>
+      <h1 class="titulo-sec">ACTIVA TUS SUPERPODERES</h1>
+      <p class="lead">Activa los sensores para que BRISA pueda ayudarte. Son opcionales: el juego también funciona solo con el teclado.</p>
+      <div class="sens-tarjetas">
+        <article class="panel sens-tarjeta">
+          <div class="sens-icono">🎤</div>
+          <h3>MICRÓFONO</h3>
+          <p>Sopla para darle oxígeno al fuego y grita para pedir auxilio.</p>
+          <div class="medidor"><div class="medidor-barra" id="sens-mic-barra"></div><span class="medidor-umbral">SOPLO</span></div>
+          <p class="estado" id="sens-mic-estado">Apagado</p>
+          <div class="fila">
+            <button class="btn btn-mini btn-primario" id="btn-mic">ACTIVAR MICRÓFONO</button>
+            <button class="btn btn-mini" id="btn-calibrar">CALIBRAR SILENCIO</button>
+          </div>
+        </article>
+        <article class="panel sens-tarjeta">
+          <div class="sens-icono">🗣️</div>
+          <h3>COMANDOS DE VOZ</h3>
+          <div class="chips"><span>«RECOGER»</span><span>«¿QUÉ ES?»</span><span>«LISTO»</span><span>«BEBER»</span><span>«COMER»</span><span>«CHISPA»</span><span>«¡AUXILIO!»</span></div>
+          <p class="estado" id="sens-voz-estado">Apagado</p>
+          <p class="oido">Oí: <b id="sens-voz-oido">—</b></p>
+          <button class="btn btn-mini btn-primario" id="btn-voz">ACTIVAR VOZ</button>
+        </article>
+        <article class="panel sens-tarjeta">
+          <canvas class="brisa-avatar" id="brisa-avatar" width="240" height="160"></canvas>
+          <h3>VOZ DE BRISA</h3>
+          <p>BRISA explicará en voz alta cada objeto que encuentres.</p>
+          <p class="estado" id="sens-tts-estado">—</p>
+          <button class="btn btn-mini btn-primario" id="btn-probar-voz">PROBAR VOZ</button>
+        </article>
+      </div>
+      <div class="teclas panel">
+        <span><kbd>←</kbd><kbd>→</kbd> mover</span>
+        <span><kbd>E</kbd> recoger / usar</span>
+        <span><kbd>1</kbd> beber coco</span>
+        <span><kbd>2</kbd> comer guayaba</span>
+        <span><kbd>ESPACIO</kbd> soplar</span>
+        <span><kbd>ESC</kbd> pausa</span>
+      </div>
+      <div class="fila centro">
+        <button class="btn btn-primario btn-grande" id="btn-comenzar">COMENZAR MISIÓN ▶</button>
+      </div>
+      <p class="nota">Funciona mejor en Google Chrome y con audífonos que tengan micrófono.</p>
+    </div>
+  </section>
+
+  <!-- =============================== JUEGO =============================== -->
+  <section id="pantalla-juego" class="pantalla">
+    <canvas id="lienzo"></canvas>
+
+    <div id="hud">
+      <div class="panel hud-vitales">
+        <div class="vital"><span>💧 HIDRATACIÓN</span><b id="hud-hidr-num">100%</b></div>
+        <div class="barra"><div id="hud-hidr" class="relleno cian"></div></div>
+        <div class="vital"><span>⚡ ENERGÍA</span><b id="hud-energ-num">100%</b></div>
+        <div class="barra"><div id="hud-energ" class="relleno ambar"></div></div>
+      </div>
+      <div class="hud-sensores">
+        <span class="chip" id="hud-mic">🎤 <span id="hud-mic-texto">mic apagado</span> <i class="mini-medidor"><i id="hud-mic-nivel"></i></i></span>
+        <span class="chip" id="hud-voz">🗣️ <span id="hud-voz-texto">voz apagada</span></span>
+        <span class="chip" id="hud-clima">☁️ —</span>
+      </div>
+      <div class="panel hud-centro">
+        <span id="hud-zona">ZONA 1/4</span><i class="sep"></i>
+        <span id="hud-tiempo">⏱ 00:00</span><i class="sep"></i>
+        <span id="hud-puntos">★ 0</span>
+      </div>
+      <div class="panel hud-mision">
+        <p class="eyebrow">⚑ Misión científica</p>
+        <p id="hud-mision-texto"></p>
+        <ul id="hud-mision-lista"></ul>
+      </div>
+      <div class="panel hud-inventario">
+        <p class="eyebrow">Inventario</p>
+        <div id="hud-inv" class="inv"></div>
+      </div>
+      <div class="panel hud-brisa" id="hud-brisa">
+        <p class="hud-brisa-cab"><i class="punto"></i> BRISA · Asistente de campo</p>
+        <p id="hud-brisa-texto">…</p>
+      </div>
+    </div>
+
+    <div id="tactil">
+      <div class="tactil-izq">
+        <button data-mantener="izq">◀</button>
+        <button data-mantener="der">▶</button>
+      </div>
+      <div class="tactil-der">
+        <button data-tecla="1">🥥</button>
+        <button data-tecla="2">🍐</button>
+        <button data-mantener="espacio">💨</button>
+        <button data-tecla="e" class="grande">E</button>
+        <button data-tecla="escape">⏸</button>
+      </div>
+    </div>
+
+    <!-- Escáner atómico -->
+    <div id="ov-tarjeta" class="overlay">
+      <div class="panel tarjeta">
+        <div class="tarjeta-cab">
+          <p class="eyebrow">◎ Escáner atómico BRISA</p>
+          <span class="chip" id="tarjeta-escuchando">🎤 Di «listo» para guardar o «¿qué es?» para repetir</span>
+        </div>
+        <div class="tarjeta-cuerpo">
+          <div class="tarjeta-objeto">
+            <div class="scan"><span id="tarjeta-emoji">🪵</span><i class="scan-anillo"></i><i class="scan-linea"></i></div>
+            <span class="chip ambar" id="tarjeta-uso"></span>
+            <span class="chip cian" id="tarjeta-pts">+100 PTS · NUEVO DESCUBRIMIENTO</span>
+          </div>
+          <div class="tarjeta-centro">
+            <h2 id="tarjeta-nombre"></h2>
+            <p class="formula" id="tarjeta-formula"></p>
+            <canvas id="tarjeta-mol" width="760" height="520"></canvas>
+            <p class="nota-mol" id="tarjeta-nota"></p>
+            <div class="leyenda" id="tarjeta-leyenda"></div>
+          </div>
+          <div class="tarjeta-brisa">
+            <p class="eyebrow">🔊 BRISA explica</p>
+            <p id="tarjeta-texto" class="tarjeta-texto"></p>
+            <div class="onda" id="tarjeta-onda"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+        <div class="tarjeta-pie">
+          <span class="pista"><kbd>A</kbd> ver átomo por átomo · <kbd>M</kbd> ver molécula · <kbd>R</kbd> repetir</span>
+          <button class="btn btn-primario" id="btn-guardar-obj">GUARDAR EN INVENTARIO [E]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retos científicos -->
+    <div id="ov-mini" class="overlay">
+      <div class="panel mini">
+        <div class="mini-cab">
+          <div><p class="eyebrow" id="mini-modulo"></p><h2 id="mini-titulo"></h2></div>
+          <span class="chip cian" id="mini-estado"></span>
+        </div>
+        <div class="mini-cuerpo">
+          <canvas id="mini-lienzo" width="1440" height="840"></canvas>
+          <aside class="mini-lado">
+            <ol class="pasos" id="mini-pasos"></ol>
+            <div class="mini-dato" id="mini-dato"></div>
+          </aside>
+        </div>
+        <p class="mini-instruccion" id="mini-instruccion"></p>
+      </div>
+    </div>
+
+    <!-- Pausa -->
+    <div id="ov-pausa" class="overlay">
+      <div class="panel caja-pausa">
+        <p class="eyebrow">Menú de pausa</p>
+        <h2>EXPEDICIÓN EN PAUSA</h2>
+        <button class="btn btn-primario" id="btn-continuar">▶ CONTINUAR [ESC]</button>
+        <button class="btn" id="btn-ayuda-pausa">❓ CÓMO SE JUEGA</button>
+        <button class="btn" id="btn-reiniciar">↻ REINICIAR PARTIDA</button>
+        <button class="btn" id="btn-menu-pausa">⌂ MENÚ PRINCIPAL</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== FINAL =============================== -->
+  <section id="pantalla-final" class="pantalla">
+    <div class="fondo" id="final-fondo"></div>
+    <div class="final-sombra"></div>
+    <div class="final-contenido">
+      <header class="final-cab">
+        <p class="eyebrow" id="final-eyebrow"></p>
+        <h1 id="final-titulo"></h1>
+        <p id="final-sub"></p>
+      </header>
+      <div class="final-cols">
+        <div class="panel final-resumen">
+          <p class="eyebrow">Resumen de la expedición</p>
+          <div class="puntaje-grande" id="final-puntos">0</div>
+          <p class="sub">PUNTOS <span id="final-bono"></span></p>
+          <div class="stats">
+            <div><b id="final-tiempo">00:00</b><span>tiempo</span></div>
+            <div><b id="final-objetos">0/13</b><span>objetos</span></div>
+            <div><b id="final-retos">0/3</b><span>retos</span></div>
+          </div>
+          <div class="insignias" id="final-insignias"></div>
+        </div>
+        <div class="panel final-dato">
+          <p class="eyebrow">🔊 Dato científico de BRISA</p>
+          <p id="final-dato"></p>
+        </div>
+        <div class="panel final-ranking">
+          <p class="eyebrow">Registra tu récord</p>
+          <form id="form-record" class="form-record" autocomplete="off">
+            <input id="input-nombre" maxlength="12" placeholder="TU NOMBRE (máx. 12)" aria-label="Tu nombre">
+            <button class="btn btn-primario" id="btn-guardar-record" type="submit">GUARDAR</button>
+          </form>
+          <p class="estado" id="record-estado"></p>
+          <p class="eyebrow" id="ranking-estado-final">Top 5 de la feria</p>
+          <ol class="ranking" id="ranking-final"></ol>
+        </div>
+      </div>
+      <div class="fila centro">
+        <button class="btn btn-primario" id="btn-reintentar">↻ JUGAR DE NUEVO [R]</button>
+        <button class="btn" id="btn-menu-final">⌂ MENÚ PRINCIPAL</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== CÓMO SE JUEGA =========================== -->
+  <div id="ov-ayuda" class="overlay">
+    <div class="panel ayuda">
+      <p class="eyebrow">Manual de campo</p>
+      <h2>CÓMO SE JUEGA</h2>
+      <div class="ayuda-cols">
+        <div>
+          <h3>🎯 Objetivo</h3>
+          <p>Cruza la isla (playa → selva → campamento → cumbre), recoge y escanea los objetos que brillan, supera los <b>3 retos científicos</b> y envía el S.O.S. antes de que tu <b>hidratación</b> o tu <b>energía</b> lleguen a cero.</p>
+          <h3>🧪 Los 3 retos</h3>
+          <ul>
+            <li>💧 <b>Destilador solar</b> (botella y agua de mar): el agua se evapora y se condensa, y la sal se queda. Usa la radiación solar REAL del colegio en este momento.</li>
+            <li>🔥 <b>Triángulo del fuego</b> (madera, yesca y pedernal): raspa el pedernal y luego ¡sopla de verdad al micrófono!</li>
+            <li>📡 <b>Circuito de la baliza</b> (batería, cable de cobre y LED): cierra el circuito y ¡grita «auxilio»!</li>
+          </ul>
+        </div>
+        <div>
+          <h3>⌨️ Teclado</h3>
+          <p><kbd>←</kbd><kbd>→</kbd> mover · <kbd>E</kbd> recoger / usar · <kbd>1</kbd> beber coco · <kbd>2</kbd> comer guayaba · <kbd>ESPACIO</kbd> soplar · <kbd>ESC</kbd> pausa · <kbd>F</kbd> pantalla completa</p>
+          <h3>🗣️ Voz</h3>
+          <p>«recoger» · «¿qué es?» · «listo» · «beber» · «comer» · «chispa» · «¡auxilio!»</p>
+          <h3>🏆 Puntos</h3>
+          <p>+100 por cada objeto nuevo · +300 por cada reto · +500 por la baliza · bono por terminar rápido y con las barras altas.</p>
+        </div>
+      </div>
+      <button class="btn btn-primario" id="btn-cerrar-ayuda">ENTENDIDO</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="girar">📱↻<br>Gira tu celular para jugar</div>
+
+<!-- Firebase (scripts compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sensors.js"></script>
+<script src="js/ranking.js"></script>
+<script src="js/molecule.js"></script>
+<script src="js/cinematic.js"></script>
+<script src="js/minigames.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

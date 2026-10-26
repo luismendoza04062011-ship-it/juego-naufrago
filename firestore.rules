@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ranking de NÁUFRAGO: cualquiera puede leer el Top 5 y crear un récord válido,
+    // pero nadie puede editar ni borrar récords ajenos.
+    match /records_feria/{doc} {
+      allow read: if true;
+      allow create: if request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 12
+        && request.resource.data.puntaje is int
+        && request.resource.data.puntaje >= 0
+        && request.resource.data.puntaje < 100000;
+    }
+
+    // Ranking de CiberRun (juego anterior): mismas reglas abiertas que tenía en modo de prueba
+    match /jugadores/{doc} {
+      allow read, write: if true;
+    }
+  }
+}
