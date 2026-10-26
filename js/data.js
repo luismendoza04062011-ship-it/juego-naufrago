@@ -17,14 +17,14 @@ const CONFIG = {
 
   velocidadAlek: 270, // píxeles por segundo
 
-  // Firebase (mismo proyecto que CiberRun)
+  // Firebase (proyecto naufrago-juego)
   firebase: {
-    apiKey: 'AIzaSyCYQZUK7fyeWIWuUzu9ObNoAFYAIpOROp0',
-    authDomain: 'bogotaai.firebaseapp.com',
-    projectId: 'bogotaai',
-    storageBucket: 'bogotaai.firebasestorage.app',
-    messagingSenderId: '203565237055',
-    appId: '1:203565237055:web:d31bf8066f9525251ac98a'
+    apiKey: 'AIzaSyB_5DAa8Oiux2XMxUMgWNo9waTSyjSxcg4',
+    authDomain: 'naufrago-juego.firebaseapp.com',
+    projectId: 'naufrago-juego',
+    storageBucket: 'naufrago-juego.firebasestorage.app',
+    messagingSenderId: '667873125239',
+    appId: '1:667873125239:web:935ac00bccb12976bab772'
   },
   coleccionRanking: 'records_feria'
 };

@@ -14,9 +14,9 @@ service cloud.firestore {
         && request.resource.data.puntaje < 100000;
     }
 
-    // Ranking de CiberRun (juego anterior): mismas reglas abiertas que tenía en modo de prueba
-    match /jugadores/{doc} {
-      allow read, write: if true;
+    // Todo lo demás queda cerrado
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
