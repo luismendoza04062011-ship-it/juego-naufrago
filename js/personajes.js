@@ -5,6 +5,7 @@
 //  así que puede caminar, agacharse, celebrar o colgar de un cable.
 // =====================================================================
 
+const ESCALA_ALEK = 0.9;   // tamaño de Alek en los niveles (mide unos 160 px)
 const PIEL = { base: '#c98f63', sombra: '#a46c47', luz: '#e3ad80' };
 const COLOR_ALEK = {
   contorno: '#1b130d',
@@ -68,6 +69,17 @@ function calcularPose(a) {
     P.inclinacion = 0.08;
   }
 
+  if (a.aire) {
+    // en el aire: piernas recogidas al subir y estiradas al caer
+    const subiendo = a.vy < 0;
+    P.piernas[1] = { muslo: -0.8, rodilla: subiendo ? 1.15 : 0.5 };
+    P.piernas[0] = { muslo: 0.35, rodilla: subiendo ? 0.95 : 0.4 };
+    P.brazos[1] = { hombro: subiendo ? -2.2 : -1.3, codo: -0.4 };
+    P.brazos[0] = { hombro: subiendo ? 0.7 : -0.7, codo: -0.5 };
+    P.rebote = 0;
+    P.inclinacion = 0.05;
+  }
+
   if (a.cansado) { P.inclinacion += 0.16; P.cabeza = 0.2; }
 
   const k = a.poseT || 0;
@@ -109,7 +121,7 @@ function calcularPose(a) {
 // a = { dir, fase, mov, t, pose, poseT, cansado, item, elevado }
 function dibujarAlek(c, x, y, a) {
   const P = calcularPose(a);
-  const ESCALA = 1.12;
+  const ESCALA = a.escala || ESCALA_ALEK;
   c.save();
   c.translate(x, y);
   if (!a.elevado) {

@@ -78,6 +78,11 @@ const Sonido = {
   logro()    { [523, 659, 784, 1047].forEach((f, i) => this.tono(f, 0.22, 'triangle', 0.22, null, i * 0.09)); },
   victoria() { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tono(f, 0.4, 'triangle', 0.2, null, i * 0.12)); },
   derrota()  { [392, 349, 311, 262].forEach((f, i) => this.tono(f, 0.45, 'triangle', 0.2, null, i * 0.32)); },
+  salto()    { this.tono(280, 0.16, 'square', 0.07, 620); },
+  golpe()    { this.ruido(0.18, 0.5, 300, 'lowpass'); this.tono(180, 0.25, 'sawtooth', 0.14, 70); },
+  pisar()    { this.tono(520, 0.12, 'square', 0.1, 200); this.ruido(0.08, 0.25, 900, 'bandpass'); },
+  roca()     { this.ruido(0.3, 0.45, 220, 'lowpass'); },
+  chapuzon() { this.ruido(0.45, 0.45, 1200, 'bandpass'); this.tono(300, 0.3, 'sine', 0.1, 90); },
 
   // Rotor del helicóptero: ruido grave que se "corta" 13 veces por segundo (tap-tap-tap)
   rotor: null,

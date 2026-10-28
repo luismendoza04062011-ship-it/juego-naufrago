@@ -15,7 +15,7 @@ const ctx = lienzo.getContext('2d');
 // Clima REAL del colegio (API Open-Meteo)
 const CLIMA = { ok: false, temp: 0, lluvia: false, radiacion: 0, esDia: true, codigo: 0 };
 // Teclas que se mantienen presionadas
-const teclas = { izq: false, der: false, espacio: false };
+const teclas = { izq: false, der: false, espacio: false, arriba: false };
 
 // Estado de la partida
 const J = { estado: 'menu', t: 0, ultimaActividad: performance.now() };
@@ -91,9 +91,10 @@ function nuevaPartida() {
     flotantes: [], particulas: [], lluvia: [], motas: [], fundido: null, cercano: null,
     avisoHidr: false, avisoEnerg: false, ultimoAvisoSalida: 0, guardado: false, miRecord: null,
     causa: null, gano: false, pasoT: 0, crepT: 0,
-    tutorial: { recorrido: 0, recogio: false }, recogiendo: null
+    tutorial: { recorrido: 0, recogio: false, salto: false }, recogiendo: null,
+    salud: 3, invulnerable: 0, golpeT: 0, consejos: new Set(), camX: 0, saltoPedido: 0, saltoVoz: false
   });
-  J.jugador = { x: 70, dir: 1, fase: 0, mov: false, pose: null, poseT: 0, item: null, oculto: false };
+  J.jugador = { x: 70, y: 600, yAntes: 600, vy: 0, enSuelo: true, coyote: 0, empuje: 0, dir: 1, fase: 0, mov: false, pose: null, poseT: 0, item: null, oculto: false };
   J.brisa = { x: 20, y: 440 };
   cargarZona(0);
   pintarInventario();
@@ -102,11 +103,15 @@ function nuevaPartida() {
 function cargarZona(i) {
   J.zonaIdx = i;
   const z = ZONAS[i];
-  J.objetos = z.objetos.map(o => ({ ...o, recogido: false, fase: Math.random() * 6 }));
+  Nivel.cargar(z);
+  J.objetos = z.objetos.map(o => ({ ...o, y: o.y || z.suelo, recogido: false, fase: Math.random() * 6 }));
   J.estaciones = (z.estaciones || []).map(e => ({ ...e }));
-  J.jugador.x = 70;
+  Object.assign(J.jugador, { x: 70, y: z.suelo, yAntes: z.suelo, vy: 0, enSuelo: true, empuje: 0 });
+  J.seguro = { x: 70, y: z.suelo };
+  J.camX = 0;
   J.brisa.x = 20;
-  J.brisa.y = z.suelo - 200;
+  J.brisa.y = z.suelo - 170;
+  if (z.id === 'campamento') J.salud = 3;   // en el refugio se recupera la salud
   J.particulas = [];
   J.lluvia = [];
   if (CLIMA.lluvia && z.lluvia) for (let k = 0; k < 160; k++) J.lluvia.push({ x: Math.random() * ANCHO, y: Math.random() * ALTO, v: 700 + Math.random() * 400 });
@@ -130,7 +135,7 @@ function comenzarMision() {
   // Antes de jugar se explica la misión en una tarjeta (y BRISA la lee)
   J.estado = 'mision';
   $('ov-mision').classList.add('visible');
-  Sensores.hablar('Tu misión: llegar a la cumbre de la isla y pedir rescate. Recoge los objetos que brillan, supera tres retos científicos y no dejes que tu agua o tu energía lleguen a cero.');
+  Sensores.hablar('Tu misión: llegar a la cumbre de la isla y pedir rescate. Recoge los objetos que brillan, supera tres retos científicos y cuida tu agua, tu energía y tu salud. Esquiva los peligros saltando.');
 }
 
 function empezarAJugar() {
@@ -159,17 +164,17 @@ function buscarCercano() {
   let mejor = null, dmin = Infinity;
   J.objetos.forEach(o => {
     const d = Math.abs(o.x - x);
-    if (!o.recogido && d < 72 && d < dmin) { dmin = d; mejor = { tipo: 'objeto', ref: o }; }
+    if (!o.recogido && d < 72 && Math.abs(o.y - J.jugador.y) < 60 && d < dmin) { dmin = d; mejor = { tipo: 'objeto', ref: o }; }
   });
   J.estaciones.forEach(e => {
     const d = Math.abs(e.x - x);
-    if (d < 95 && d < dmin) { dmin = d; mejor = { tipo: 'estacion', ref: e }; }
+    if (d < 95 && Math.abs(Nivel.suelo - J.jugador.y) < 60 && d < dmin) { dmin = d; mejor = { tipo: 'estacion', ref: e }; }
   });
   return mejor;
 }
 
 function interactuar() {
-  if (J.fundido || J.jugador.pose === 'recoger') return;
+  if (J.fundido || J.jugador.pose === 'recoger' || !J.jugador.enSuelo) return;
   const c = J.cercano;
   if (!c) { decir('No hay nada cerca. Acércate a un objeto que brille.', false); Sonido.error(); return; }
   if (c.tipo === 'objeto') recoger(c.ref);
@@ -201,7 +206,7 @@ function terminarRecoger(o) {
     Tarjeta.abrir(o.id, true);
   } else {
     Sonido.recoger();
-    flotante(`+1 ${def.emoji}`, o.x, ZONAS[J.zonaIdx].suelo - 120, '#c3f5ff');
+    flotante(`+1 ${def.emoji}`, o.x, o.y - 170, '#c3f5ff');
     decir(`Guardaste otro ${def.corto.toLowerCase()} en el inventario.`, false);
   }
 }
@@ -219,7 +224,7 @@ function usarConsumible(id) {
   if (c.hidr) J.hidr = Math.min(100, J.hidr + c.hidr);
   if (c.energia) J.energia = Math.min(100, J.energia + c.energia);
   Sonido.logro();
-  flotante(c.hidr ? `+${c.hidr} 💧` : `+${c.energia} ⚡`, J.jugador.x, ZONAS[J.zonaIdx].suelo - 200, c.hidr ? '#00e5ff' : '#e5c384');
+  flotante(c.hidr ? `+${c.hidr} 💧` : `+${c.energia} ⚡`, J.jugador.x, J.jugador.y - 200, c.hidr ? '#00e5ff' : '#e5c384');
   pintarInventario();
   decir(c.hidr ? 'Hidratación recuperada. El potasio del coco ayuda a tus células a retener el agua.' : 'Energía recuperada. Los azúcares de la fruta les dan combustible a tus células.');
 }
@@ -244,7 +249,7 @@ function consumir(id) { if (J.inventario[id] > 0) J.inventario[id]--; }
 
 function completarReto(e) {
   J.retos[e.tipo] = true;
-  const y = ZONAS[J.zonaIdx].suelo - 160;
+  const y = J.jugador.y - 200;
   if (e.tipo === 'baliza') {
     sumarPuntos(500, e.x, y, 'S.O.S.');
     pintarMision();
@@ -301,7 +306,7 @@ function objetivoActual() {
   const pendientes = J.objetos.filter(o => !o.recogido);
   if (pendientes.length) {
     const o = pendientes.reduce((a, b) => Math.abs(a.x - p.x) <= Math.abs(b.x - p.x) ? a : b);
-    return { texto: `Recoge ${OBJETOS[o.id].art}`, x: o.x, y: z.suelo - 105 };
+    return { texto: `Recoge ${OBJETOS[o.id].art}`, x: o.x, y: o.y - 105 };
   }
   const estacion = J.estaciones.find(e => !J.retos[e.tipo]);
   if (estacion) {
@@ -310,20 +315,20 @@ function objetivoActual() {
   }
   if (J.zonaIdx < ZONAS.length - 1) {
     const sig = ZONAS[J.zonaIdx + 1];
-    return { texto: `Camina a la derecha hacia ${sig.hacia} →`, x: ANCHO - 70, y: z.suelo - 120, salida: true };
+    return { texto: `Avanza a la derecha hacia ${sig.hacia} →`, x: Nivel.ancho - 70, y: z.suelo - 120, salida: true };
   }
   return null;
 }
 
 function intentarSalir() {
   const p = J.jugador;
-  if (J.zonaIdx >= ZONAS.length - 1) { p.x = ANCHO - 34; return; }
+  if (J.zonaIdx >= ZONAS.length - 1) { p.x = Nivel.ancho - 34; return; }
   const faltan = faltantesZona();
   if (!faltan.total) {
     J.fundido = { a: 0, dir: 1, alMedio: () => { cargarZona(J.zonaIdx + 1); anunciarZona(); } };
     return;
   }
-  p.x = ANCHO - 34;
+  p.x = Nivel.ancho - 34;
   if (performance.now() - J.ultimoAvisoSalida > 4500) {
     J.ultimoAvisoSalida = performance.now();
     Sonido.error();
@@ -345,7 +350,7 @@ function derrota(causa) {
 // Se llama al terminar la escena del rescate (rescate.js)
 function victoria() {
   J.gano = true;
-  J.bono = Math.max(0, Math.round((480 - J.tiempo) * 5)) + Math.round(J.hidr + J.energia);
+  J.bono = Math.max(0, Math.round((600 - J.tiempo) * 5)) + Math.round(J.hidr + J.energia) + J.salud * 100;
   J.puntos += J.bono;
   mostrarFinal();
 }
@@ -488,6 +493,8 @@ function ponerAncho(id, pct) {
 }
 
 function actualizarHUD() {
+  ponerTexto('hud-salud', '❤️'.repeat(Math.max(0, J.salud)) + '🖤'.repeat(Math.max(0, 3 - J.salud)));
+  ponerTexto('hud-ambiente', ZONAS[J.zonaIdx].ambiente ? ZONAS[J.zonaIdx].ambiente.texto : '');
   ponerAncho('hud-hidr', J.hidr);
   ponerTexto('hud-hidr-num', Math.ceil(Math.max(0, J.hidr)) + '%');
   ponerAncho('hud-energ', J.energia);
@@ -561,10 +568,92 @@ function pintarInventario() {
 }
 
 // ======================================================== CICLO DEL JUEGO
+// Física del salto (en píxeles): la gravedad frena a Alek al subir y lo acelera al caer
+const FISICA = { gravedad: 2300, salto: 850, corte: -320, caidaMax: 1400 };
+
+function pedirSalto(porVoz = false) {
+  if (J.estado !== 'juego') return;
+  J.saltoPedido = 0.14;      // si se presiona justo antes de tocar el piso, igual salta
+  J.saltoVoz = porVoz;       // por voz siempre es salto completo
+}
+
+// BRISA explica cada peligro la primera vez que aparece
+function consejo(clave) {
+  if (!J.consejos || J.consejos.has(clave) || !CONSEJOS[clave]) return;
+  J.consejos.add(clave);
+  decir(CONSEJOS[clave]);
+}
+
+function herir(motivo, dirEmpuje = 0, forzado = false) {
+  if (J.estado !== 'juego' || (J.invulnerable > 0 && !forzado)) return;
+  const p = J.jugador;
+  J.salud -= 1;
+  J.invulnerable = 1.4;
+  J.golpeT = 0.35;
+  Sonido.golpe();
+  if (dirEmpuje) { p.empuje = dirEmpuje * 420; p.vy = -380; p.enSuelo = false; }
+  flotante('-1 ❤️', p.x, p.y - 200, '#ff5252');
+  if (J.salud <= 0) { J.salud = 0; derrota('heridas'); return; }
+  consejo(motivo);
+}
+
+// Si Alek cae a un hueco, pierde 1 ❤️ y vuelve al último lugar seguro
+function caerAlHueco() {
+  const tipo = Nivel.z.peligro || 'abismo';
+  const p = J.jugador;
+  if (tipo === 'agua') Sonido.chapuzon();
+  for (let k = 0; k < 16; k++) J.particulas.push({ x: p.x, y: Nivel.suelo + 26, vx: (Math.random() - 0.5) * 260, vy: -150 - Math.random() * 250, g: 900, r: 2 + Math.random() * 3, vida: 0.7, vidaMax: 0.7, chispa: tipo === 'agua', piedra: tipo !== 'agua' });
+  Object.assign(p, { x: J.seguro.x, y: J.seguro.y, yAntes: J.seguro.y, vy: 0, enSuelo: true, empuje: 0 });
+  herir(tipo, 0, true);
+}
+
+function romperRoca(r) {
+  Sonido.roca();
+  for (let k = 0; k < 12; k++) J.particulas.push({ x: r.x, y: Math.min(r.y, r.piso - 4), vx: (Math.random() - 0.5) * 300, vy: -Math.random() * 260, g: 900, r: 2 + Math.random() * 3, vida: 0.6, vidaMax: 0.6, piedra: true });
+}
+
+// Choques con enemigos y rocas
+function revisarPeligros() {
+  const p = J.jugador;
+  const yo = { x1: p.x - 16, x2: p.x + 16, y1: p.y - 140, y2: p.y };
+  const toca = (a, b) => a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
+  Nivel.enemigos.forEach(e => {
+    if (!e.vivo) return;
+    if (Math.abs(e.x - p.x) < 480) consejo(e.tipo);
+    const caja = Nivel.cajaEnemigo(e);
+    if (!toca(yo, caja)) return;
+    if (p.vy > 120 && p.yAntes <= caja.y1 + 14) {
+      // cayó encima: lo vence y rebota
+      e.vivo = false;
+      e.muerteT = 0.45;
+      p.vy = -560;
+      p.enSuelo = false;
+      Sonido.pisar();
+      sumarPuntos(50, e.x, e.y - 70, '¡BIEN!');
+    } else {
+      herir(e.tipo, p.x < e.x ? -1 : 1);
+    }
+  });
+  Nivel.rocas.forEach(r => {
+    if (r.y > -10 && Math.abs(r.x - p.x) < 320) consejo('roca');
+    if (Math.abs(r.x - p.x) < 16 + r.r && r.y + r.r > p.y - 140 && r.y - r.r < p.y) {
+      r.rota = true; romperRoca(r); herir('roca', p.x < r.x ? -1 : 1);
+    } else if (r.y + r.r * 0.6 >= r.piso) {
+      r.rota = true; romperRoca(r);
+    }
+  });
+  Nivel.rocas = Nivel.rocas.filter(r => !r.rota);
+  if (Nivel.viento.fuerza > 0.3) consejo('viento');
+}
+
 function actualizarJuego(dt) {
   const z = ZONAS[J.zonaIdx];
   const p = J.jugador;
+  const ambiente = z.ambiente || { agua: 1, energia: 1 };
   J.tiempo += dt;
+  J.invulnerable = Math.max(0, J.invulnerable - dt);
+  J.golpeT = Math.max(0, J.golpeT - dt);
+  p.yAntes = p.y;
 
   // transición entre zonas (fundido a negro)
   if (J.fundido) {
@@ -580,9 +669,9 @@ function actualizarJuego(dt) {
     if (antes < 0.35 && p.poseT >= 0.35) {
       p.item = OBJETOS[o.id].emoji;
       Sonido.recoger();
-      for (let k = 0; k < 18; k++) J.particulas.push({ x: o.x, y: z.suelo - 40, vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 220, r: 2 + Math.random() * 2, vida: 0.7, vidaMax: 0.7, chispa: true });
+      for (let k = 0; k < 18; k++) J.particulas.push({ x: o.x, y: o.y - 40, vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 220, r: 2 + Math.random() * 2, vida: 0.7, vidaMax: 0.7, chispa: true });
     }
-    if (antes < 0.6 && p.poseT >= 0.6 && !J.descubiertos.has(o.id)) sumarPuntos(100, p.x, z.suelo - 250, 'DESCUBRIMIENTO');
+    if (antes < 0.6 && p.poseT >= 0.6 && !J.descubiertos.has(o.id)) sumarPuntos(100, p.x, p.y - 210, 'DESCUBRIMIENTO');
     if (p.poseT >= 1) {
       p.pose = null;
       p.item = null;
@@ -594,23 +683,54 @@ function actualizarJuego(dt) {
       p.poseT += dt;
       if (p.poseT > 1.4) p.pose = null;
     }
-    // movimiento (más lento si está cansado)
+    // caminar (más lento si está cansado; el viento empuja hacia atrás)
     const dir = p.pose ? 0 : (teclas.der ? 1 : 0) - (teclas.izq ? 1 : 0);
-    p.mov = dir !== 0;
+    p.mov = dir !== 0 && p.enSuelo;
     if (dir) p.dir = dir;
     const cansado = J.hidr < 25 || J.energia < 25;
-    p.x += dir * CONFIG.velocidadAlek * (cansado ? 0.75 : 1) * dt;
+    p.x += (dir * CONFIG.velocidadAlek * (cansado ? 0.75 : 1) - 170 * Nivel.viento.fuerza + p.empuje) * dt;
+    p.empuje *= Math.pow(0.02, dt);
     J.tutorial.recorrido += Math.abs(dir * CONFIG.velocidadAlek * dt);
-    if (p.x < 40) p.x = 40;
-    if (p.x > ANCHO - 30) intentarSalir();
+
+    // saltar
+    J.saltoPedido = Math.max(0, J.saltoPedido - dt);
+    p.coyote = p.enSuelo ? 0.1 : Math.max(0, p.coyote - dt);
+    if (J.saltoPedido > 0 && p.coyote > 0 && !p.pose) {
+      p.vy = -FISICA.salto;
+      p.enSuelo = false;
+      p.coyote = 0;
+      J.saltoPedido = 0;
+      J.energia -= CONFIG.energiaPorSalto;
+      Sonido.salto();
+      if (!J.tutorial.salto) { J.tutorial.salto = true; consejo('salto'); }
+    }
+    if (!teclas.arriba && !J.saltoVoz && p.vy < FISICA.corte) p.vy = FISICA.corte;   // soltar la tecla = salto corto
+
+    // gravedad y aterrizaje sobre el piso o las plataformas
+    p.vy = Math.min(FISICA.caidaMax, p.vy + FISICA.gravedad * dt);
+    let yNueva = p.y + p.vy * dt;
+    const piso = p.vy >= 0 ? Nivel.aterrizaje(p.x, p.y, yNueva) : null;
+    if (piso) { yNueva = piso.y; p.vy = 0; p.enSuelo = true; J.saltoVoz = false; } else p.enSuelo = false;
+    p.y = yNueva;
+    if (piso && piso.piso && p.x > piso.x1 + 40 && p.x < piso.x2 - 40) J.seguro = { x: p.x, y: p.y };
+
+    if (p.x < 30) p.x = 30;
+    if (p.x > Nivel.ancho - 30) intentarSalir();
+    if (p.y > Nivel.suelo + 120) caerAlHueco();
   }
+  if (J.estado !== 'juego') return;   // pudo perder en un hueco
   const faseAntes = p.fase;
   p.fase += dt * (p.mov ? 10 : 2);
   if (p.mov && Math.floor(faseAntes / Math.PI) !== Math.floor(p.fase / Math.PI)) Sonido.paso();
 
-  // supervivencia: las barras bajan con el tiempo
-  J.hidr -= 100 / CONFIG.segundosHidratacion * dt;
-  J.energia -= 100 / CONFIG.segundosEnergia * dt;
+  // peligros del nivel (enemigos, rocas, viento)
+  Nivel.actualizar(dt, p);
+  revisarPeligros();
+  if (J.estado !== 'juego') return;
+
+  // supervivencia: las barras bajan con el tiempo (cada zona gasta distinto)
+  J.hidr -= 100 / CONFIG.segundosHidratacion * ambiente.agua * dt;
+  J.energia -= 100 / CONFIG.segundosEnergia * ambiente.energia * dt;
   if (J.hidr < 30 && !J.avisoHidr) {
     J.avisoHidr = true; Sonido.alerta();
     decir(J.inventario.coco > 0 ? 'Alerta: tu hidratación está baja. Presiona la tecla 1 para hidratarte con el coco.' : 'Alerta: tu hidratación está baja. Necesitamos agua pronto.');
@@ -624,21 +744,25 @@ function actualizarJuego(dt) {
   if (J.hidr <= 0) { J.hidr = 0; derrota('hidratacion'); return; }
   if (J.energia <= 0) { J.energia = 0; derrota('energia'); return; }
 
+  // la cámara sigue a Alek (un poco adelantada)
+  const camObjetivo = limitar(p.x - ANCHO * 0.4, 0, Nivel.ancho - ANCHO);
+  J.camX += (camObjetivo - J.camX) * Math.min(1, dt * 6);
+
   // BRISA sigue a Alek flotando detrás de su hombro
-  const objetivoX = p.x - p.dir * 58;
-  const objetivoY = z.suelo - 205 + Math.sin(J.t * 2.2) * 7;
+  const objetivoX = p.x - p.dir * 50;
+  const objetivoY = p.y - 170 + Math.sin(J.t * 2.2) * 7;
   J.brisa.x += (objetivoX - J.brisa.x) * Math.min(1, dt * 3);
   J.brisa.y += (objetivoY - J.brisa.y) * Math.min(1, dt * 3);
 
   J.cercano = J.fundido || p.pose === 'recoger' ? null : buscarCercano();
 
-  // partículas: fuego del campamento, lluvia, motas
+  // partículas: fuego del campamento, lluvia, textos flotantes
   if (z.id === 'campamento' && J.retos.fuego) {
     if (Math.random() < dt * 40) J.particulas.push({ x: 1192 + (Math.random() - 0.5) * 40, y: 500, vx: (Math.random() - 0.5) * 16, vy: -60 - Math.random() * 60, r: 5 + Math.random() * 7, vida: 0.8, vidaMax: 0.8, fuego: true });
     J.crepT -= dt;
     if (J.crepT <= 0) { Sonido.crepitar(); J.crepT = 0.15 + Math.random() * 0.4; }
   }
-  J.particulas = J.particulas.filter(q => { q.vida -= dt; q.x += q.vx * dt; q.y += q.vy * dt; return q.vida > 0; });
+  J.particulas = J.particulas.filter(q => { q.vida -= dt; q.vy += (q.g || 0) * dt; q.x += q.vx * dt; q.y += q.vy * dt; return q.vida > 0; });
   J.lluvia.forEach(d => { d.y += d.v * dt; d.x -= d.v * 0.15 * dt; if (d.y > ALTO) { d.y = -20; d.x = Math.random() * (ANCHO + 100); } });
   J.flotantes = J.flotantes.filter(f => { f.vida -= dt; f.y -= 40 * dt; return f.vida > 0; });
 }
@@ -649,117 +773,98 @@ function dibujarMundo() {
   c.setTransform(lienzo.width / ANCHO, 0, 0, lienzo.height / ALTO, 0, 0);
   const z = ZONAS[J.zonaIdx];
   const t = J.t;
+  const p = J.jugador;
+  const camX = J.camX;
 
-  // fondo (ilustración de Google Stitch)
-  const img = IMG[z.id];
-  if (img.complete && img.naturalWidth) c.drawImage(img, 0, 0, ANCHO, ALTO);
-  else {
-    const g = c.createLinearGradient(0, 0, 0, ALTO);
-    g.addColorStop(0, '#1d5f8a'); g.addColorStop(1, '#c9a66b');
-    c.fillStyle = g; c.fillRect(0, 0, ANCHO, ALTO);
-  }
+  // ---- fondo (se mueve más lento: profundidad)
+  Nivel.dibujarFondo(c, camX);
   if (CLIMA.lluvia && z.lluvia) { c.fillStyle = 'rgba(20,35,50,0.28)'; c.fillRect(0, 0, ANCHO, ALTO); }
-  // sombras para que el HUD se lea bien
-  let g = c.createLinearGradient(0, 0, 0, 170);
-  g.addColorStop(0, 'rgba(5,8,10,0.55)'); g.addColorStop(1, 'rgba(5,8,10,0)');
-  c.fillStyle = g; c.fillRect(0, 0, ANCHO, 170);
-  g = c.createLinearGradient(0, ALTO - 240, 0, ALTO);
-  g.addColorStop(0, 'rgba(5,8,10,0)'); g.addColorStop(1, 'rgba(5,8,10,0.55)');
-  c.fillStyle = g; c.fillRect(0, ALTO - 240, ANCHO, 240);
-
-  // motas de luz (selva)
+  const sombra = c.createLinearGradient(0, 0, 0, 170);
+  sombra.addColorStop(0, 'rgba(5,8,10,0.55)'); sombra.addColorStop(1, 'rgba(5,8,10,0)');
+  c.fillStyle = sombra; c.fillRect(0, 0, ANCHO, 170);
   J.motas.forEach(m => {
     const x = m.x + Math.sin(t * 0.5 + m.f) * 20, y = m.y + Math.cos(t * 0.4 + m.f) * 14;
     c.fillStyle = `rgba(255,250,200,${0.25 + 0.25 * Math.sin(t * 2 + m.f)})`;
     c.beginPath(); c.arc(x, y, 2, 0, Math.PI * 2); c.fill();
   });
 
-  // viento en la cumbre
-  if (z.viento) {
-    c.strokeStyle = 'rgba(255,255,255,0.25)'; c.lineWidth = 1.5;
-    for (let k = 0; k < 6; k++) {
-      const x = ((t * 420 + k * 260) % (ANCHO + 300)) - 150, y = 200 + k * 55 + Math.sin(t + k) * 10;
-      c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 60, y - 8, x + 120, y); c.stroke();
-    }
-  }
+  // ---- mundo (se mueve con la cámara)
+  c.save();
+  c.translate(-camX, 0);
+  Nivel.dibujarTerreno(c, camX, t);
 
-  // fogata encendida en el campamento
   if (z.id === 'campamento' && J.retos.fuego) {
     const r = 120 + Math.sin(t * 9) * 8;
     const luz = c.createRadialGradient(1192, 505, 10, 1192, 505, r);
     luz.addColorStop(0, 'rgba(255,170,60,0.55)'); luz.addColorStop(1, 'rgba(255,120,30,0)');
     c.fillStyle = luz; c.beginPath(); c.arc(1192, 505, r, 0, Math.PI * 2); c.fill();
   }
+  if (z.id === 'cumbre') {
+    const baliza = J.estaciones.find(e => e.tipo === 'baliza');
+    const lampara = Nivel.dibujarTorre(c, baliza.x, Nivel.suelo, J.retos.baliza);
+    if (J.retos.baliza) dibujarLuzBaliza(c, t, lampara.x, lampara.y);
+  }
+
+  J.estaciones.forEach(e => dibujarEstacion(c, e, z, t));
+  J.objetos.forEach(o => { if (!o.recogido && o.x > camX - 60 && o.x < camX + ANCHO + 60) dibujarObjeto(c, o, t); });
+  Nivel.dibujarEnemigos(c, camX);
+  Nivel.dibujarRocas(c);
+
   J.particulas.forEach(q => {
     const a = q.vida / q.vidaMax;
-    c.fillStyle = q.fuego ? `rgba(255,${120 + 100 * a | 0},40,${0.85 * a})` : q.chispa ? `rgba(0,229,255,${a})` : `rgba(255,255,255,${a})`;
+    c.fillStyle = q.fuego ? `rgba(255,${120 + 100 * a | 0},40,${0.85 * a})` : q.chispa ? `rgba(0,229,255,${a})` : q.piedra ? `rgba(120,125,130,${a})` : `rgba(255,255,255,${a})`;
     c.beginPath(); c.arc(q.x, q.y, q.r * (0.5 + a * 0.5), 0, Math.PI * 2); c.fill();
   });
 
-  // baliza encendida en la cumbre (después de reparar el circuito)
-  if (z.id === 'cumbre' && J.retos.baliza) dibujarLuzBaliza(c, t);
-
-  J.estaciones.forEach(e => dibujarEstacion(c, e, z, t));
-  J.objetos.forEach(o => { if (!o.recogido) dibujarObjeto(c, o, z, t); });
-
-  const p = J.jugador;
   // mientras Alek se agacha, BRISA escanea el objeto con un rayo
   if (p.pose === 'recoger' && J.recogiendo && p.poseT < 0.35) {
     const o = J.recogiendo;
-    const oy = z.suelo - 40 - p.poseT * 40;
+    const oy = o.y - 40 - p.poseT * 40;
     c.save();
     c.globalCompositeOperation = 'lighter';
     c.fillStyle = 'rgba(0,229,255,0.28)';
     c.beginPath(); c.moveTo(J.brisa.x, J.brisa.y); c.lineTo(o.x - 26, oy + 20); c.lineTo(o.x + 26, oy + 20); c.closePath(); c.fill();
     c.restore();
-    c.font = `46px ${FUENTE_EMOJI}`;
+    c.font = `40px ${FUENTE_EMOJI}`;
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(OBJETOS[o.id].emoji, o.x, oy);
   }
-  if (!p.oculto) {
+  // Alek parpadea mientras es invulnerable (después de un golpe)
+  const parpadeo = J.invulnerable > 0 && Math.floor(t * 12) % 2 === 0;
+  if (!p.oculto && !parpadeo) {
     const elevacion = J.estado === 'rescate' ? Rescate.elevacion : 0;
-    dibujarAlek(c, p.x, z.suelo - elevacion, {
+    dibujarAlek(c, p.x, p.y - elevacion, {
       dir: p.dir, fase: p.fase, mov: p.mov, t, pose: p.pose, poseT: p.poseT, item: p.item,
+      aire: J.estado === 'juego' && !p.enSuelo, vy: p.vy,
       cansado: J.estado === 'juego' && (J.hidr < 25 || J.energia < 25), elevado: elevacion > 2
     });
   }
   dibujarDron(c, J.brisa.x, J.brisa.y, 1, t, p.dir);
   if (J.estado === 'rescate') Rescate.dibujar(c);
 
-  // guía para jugar: flecha sobre el objetivo y ayuda de cómo caminar
+  // guía: flecha al objetivo y globos de ayuda
   if (J.estado === 'juego' && !p.pose) {
     const obj = objetivoActual();
-    if (obj && !obj.salida && Math.abs(obj.x - p.x) > 90) flechaObjetivo(c, obj.x, obj.y, t);
-    if (J.zonaIdx === 0 && J.tutorial.recorrido < 140 && !J.tutorial.recogio && !J.cercano) {
+    if (obj && !obj.salida && Math.abs(obj.x - p.x) > 90) flechaObjetivo(c, obj.x, obj.y, t, camX);
+    if (J.zonaIdx === 0 && !J.cercano) {
       const tactil = matchMedia('(pointer: coarse)').matches;
-      burbuja(c, p.x, z.suelo - 232, tactil ? 'Camina con los botones ◀ ▶' : 'Camina con las flechas ← →');
+      if (J.tutorial.recorrido < 140 && !J.tutorial.recogio) burbuja(c, p.x, p.y - 200, tactil ? 'Camina con los botones ◀ ▶' : 'Camina con las flechas ← →');
+      else if (!J.tutorial.salto && p.x > 360) burbuja(c, p.x, p.y - 200, tactil ? 'Salta con el botón ⤒' : 'Salta con ↑ o ESPACIO');
     }
   }
-
-  // lluvia real (si en el colegio está lloviendo)
-  if (J.lluvia.length) {
-    c.strokeStyle = 'rgba(200,225,255,0.45)'; c.lineWidth = 1.2;
-    c.beginPath();
-    J.lluvia.forEach(d => { c.moveTo(d.x, d.y); c.lineTo(d.x - 4, d.y + 16); });
-    c.stroke();
-  }
-
-  // indicador de salida
   if (J.zonaIdx < ZONAS.length - 1 && !faltantesZona().total) {
-    const x = ANCHO - 70 + Math.sin(t * 5) * 8, y = z.suelo - 70;
+    const x = Nivel.ancho - 70 + Math.sin(t * 5) * 8, y = z.suelo - 70;
     c.fillStyle = 'rgba(0,229,255,0.9)';
     c.font = '700 15px "JetBrains Mono", monospace'; c.textAlign = 'center';
     c.fillText('CONTINÚA', x, y - 26);
     c.font = '700 40px "Space Grotesk", sans-serif';
     c.fillText('→', x, y + 8);
   }
-
-  // etiqueta del objeto o estación cercana
   if (J.cercano && J.estado === 'juego') {
     const ref = J.cercano.ref;
     if (J.cercano.tipo === 'objeto') {
       const conocido = J.descubiertos.has(ref.id);
-      etiqueta(c, ref.x, z.suelo - 236, OBJETOS[ref.id].nombre, conocido ? '[E] RECOGER OTRO' : '[E] RECOGER Y ESCANEAR · o di «recoger»', '#00e5ff');
+      etiqueta(c, ref.x, ref.y - 200, OBJETOS[ref.id].nombre, conocido ? '[E] RECOGER OTRO' : '[E] RECOGER Y ESCANEAR · o di «recoger»', '#00e5ff');
     } else if (J.retos[ref.tipo]) {
       etiqueta(c, ref.x, ref.marcaY - 70, ref.nombre, '✓ RETO SUPERADO', '#6fdc8c');
     } else {
@@ -767,8 +872,6 @@ function dibujarMundo() {
       etiqueta(c, ref.x, ref.marcaY - 70, ref.nombre, `${req}   [E] USAR`, '#e5c384');
     }
   }
-
-  // textos flotantes (+puntos)
   J.flotantes.forEach(f => {
     c.globalAlpha = Math.min(1, f.vida);
     c.font = '700 22px "JetBrains Mono", monospace';
@@ -779,26 +882,46 @@ function dibujarMundo() {
     c.fillText(f.texto, f.x, f.y);
     c.globalAlpha = 1;
   });
+  c.restore();
 
+  // ---- encima de todo (no se mueve con la cámara)
+  if (z.viento) {
+    const fuerza = Nivel.viento.fuerza;
+    c.strokeStyle = `rgba(255,255,255,${0.22 + 0.5 * fuerza})`; c.lineWidth = 1.5 + fuerza;
+    for (let k = 0; k < 6 + Math.round(fuerza * 10); k++) {
+      const x = ANCHO + 150 - ((t * (420 + 600 * fuerza) + k * 233) % (ANCHO + 300)), y = 170 + (k * 61) % 420 + Math.sin(t + k) * 10;
+      c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 60, y - 8, x + 120 + 80 * fuerza, y); c.stroke();
+    }
+  }
+  if (J.lluvia.length) {
+    c.strokeStyle = 'rgba(200,225,255,0.45)'; c.lineWidth = 1.2;
+    c.beginPath();
+    J.lluvia.forEach(d => { c.moveTo(d.x, d.y); c.lineTo(d.x - 4, d.y + 16); });
+    c.stroke();
+  }
+  if (J.estado === 'rescate') Rescate.dibujarPantalla(c);
+  if (J.golpeT > 0) {                                     // destello rojo al recibir un golpe
+    c.strokeStyle = `rgba(255,50,50,${J.golpeT * 1.6})`; c.lineWidth = 40;
+    c.strokeRect(0, 0, ANCHO, ALTO);
+  }
   if (J.fundido) { c.fillStyle = `rgba(0,0,0,${J.fundido.a})`; c.fillRect(0, 0, ANCHO, ALTO); }
 }
 
-function dibujarObjeto(c, o, z, t) {
-  const base = z.suelo - 6;
+function dibujarObjeto(c, o, t) {
+  const base = o.y - 6;
   const pulso = 0.5 + 0.5 * Math.sin(t * 3 + o.fase);
   const brillo = c.createRadialGradient(o.x, base, 2, o.x, base, 46);
   brillo.addColorStop(0, `rgba(0,229,255,${0.35 + 0.25 * pulso})`); brillo.addColorStop(1, 'rgba(0,229,255,0)');
   c.fillStyle = brillo;
   c.beginPath(); c.ellipse(o.x, base, 46, 14, 0, 0, Math.PI * 2); c.fill();
-  const y = base - 40 + Math.sin(t * 2 + o.fase) * 6;
+  const y = base - 36 + Math.sin(t * 2 + o.fase) * 6;
   c.save();
-  c.font = `46px ${FUENTE_EMOJI}`;
+  c.font = `40px ${FUENTE_EMOJI}`;
   c.textAlign = 'center'; c.textBaseline = 'middle';
   c.shadowColor = 'rgba(0,229,255,0.95)';
   c.shadowBlur = 14 + 10 * pulso;
   c.fillText(OBJETOS[o.id].emoji, o.x, y);
   c.restore();
-  // destello
   const d = (t * 1.3 + o.fase) % 3;
   if (d < 0.4) {
     c.strokeStyle = `rgba(255,255,255,${1 - d / 0.4})`; c.lineWidth = 2;
@@ -834,7 +957,7 @@ function etiqueta(c, x, y, titulo, sub, color) {
   c.font = `600 13px "JetBrains Mono", ${FUENTE_EMOJI}`;
   const w2 = c.measureText(sub).width;
   const w = Math.max(w1, w2) + 30, h = 54;
-  const bx = limitar(x - w / 2, 10, ANCHO - w - 10), by = y - h;
+  const bx = limitar(x - w / 2, J.camX + 10, J.camX + ANCHO - w - 10), by = y - h;
   c.fillStyle = 'rgba(12,17,20,0.88)';
   rr(c, bx, by, w, h, 4); c.fill();
   c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
@@ -847,14 +970,24 @@ function etiqueta(c, x, y, titulo, sub, color) {
   c.fillText(sub, bx + 15, by + 43);
 }
 
-// Flecha que rebota sobre el siguiente objetivo
-function flechaObjetivo(c, x, y, t) {
-  const by = y - 30 + Math.sin(t * 6) * 7;
+// Flecha que rebota sobre el siguiente objetivo (si está fuera de la pantalla, señala hacia dónde ir)
+function flechaObjetivo(c, x, y, t, camX) {
   c.save();
   c.shadowColor = 'rgba(0,229,255,0.9)';
   c.shadowBlur = 14;
   c.fillStyle = '#00e5ff';
-  c.beginPath(); c.moveTo(x - 15, by - 18); c.lineTo(x + 15, by - 18); c.lineTo(x, by); c.closePath(); c.fill();
+  if (x > camX + ANCHO - 40 || x < camX + 40) {
+    const der = x > camX + ANCHO - 40;
+    const bx = der ? camX + ANCHO - 30 + Math.sin(t * 6) * 6 : camX + 30 - Math.sin(t * 6) * 6;
+    const by = limitar(y, 200, 560);
+    c.beginPath();
+    if (der) { c.moveTo(bx - 18, by - 16); c.lineTo(bx, by); c.lineTo(bx - 18, by + 16); }
+    else { c.moveTo(bx + 18, by - 16); c.lineTo(bx, by); c.lineTo(bx + 18, by + 16); }
+    c.closePath(); c.fill();
+  } else {
+    const by = y - 30 + Math.sin(t * 6) * 7;
+    c.beginPath(); c.moveTo(x - 15, by - 18); c.lineTo(x + 15, by - 18); c.lineTo(x, by); c.closePath(); c.fill();
+  }
   c.restore();
 }
 
@@ -862,7 +995,7 @@ function flechaObjetivo(c, x, y, t) {
 function burbuja(c, x, y, texto) {
   c.font = '700 17px "Chivo", sans-serif';
   const w = c.measureText(texto).width + 32, h = 40;
-  const bx = limitar(x - w / 2, 10, ANCHO - w - 10), by = y - h;
+  const bx = limitar(x - w / 2, J.camX + 10, J.camX + ANCHO - w - 10), by = y - h;
   c.fillStyle = 'rgba(255,255,255,0.95)';
   rr(c, bx, by, w, h, 10); c.fill();
   c.beginPath(); c.moveTo(x - 9, by + h); c.lineTo(x + 9, by + h); c.lineTo(x, by + h + 12); c.closePath(); c.fill();
@@ -871,9 +1004,8 @@ function burbuja(c, x, y, texto) {
   c.fillText(texto, bx + w / 2, by + h / 2 + 1);
 }
 
-// Luz giratoria de la baliza en lo alto de la antena
-function dibujarLuzBaliza(c, t) {
-  const lx = 440, ly = 118;
+// Luz giratoria de la baliza en lo alto de la torre
+function dibujarLuzBaliza(c, t, lx, ly) {
   c.save();
   c.globalCompositeOperation = 'lighter';
   const ang = t * 1.6;
@@ -901,7 +1033,7 @@ function mostrarFinal() {
   fondo.style.backgroundImage = `url(${J.gano ? 'assets/img/cine_baliza.jpg' : 'assets/img/menu.jpg'})`;
   fondo.style.filter = J.gano ? '' : 'grayscale(.7) sepia(.4) hue-rotate(-25deg) brightness(.6)';
   $('final-eyebrow').textContent = J.gano ? 'Estado de la operación: éxito total' : 'Estado de la operación: señal vital perdida';
-  $('final-titulo').textContent = J.gano ? '¡RESCATADO! Sobreviviste con ciencia' : (J.causa === 'hidratacion' ? 'DESHIDRATACIÓN SEVERA' : 'ENERGÍA AGOTADA');
+  $('final-titulo').textContent = J.gano ? '¡RESCATADO! Sobreviviste con ciencia' : ({ hidratacion: 'DESHIDRATACIÓN SEVERA', energia: 'ENERGÍA AGOTADA', heridas: 'HERIDAS GRAVES' })[J.causa];
   $('final-sub').textContent = J.gano ? 'El buque Orión recibió tu señal de auxilio y Alek vuelve a casa.' : 'Alek no alcanzó a pedir rescate. ¡Inténtalo otra vez!';
   $('final-puntos').textContent = formatoPuntos(J.puntos);
   $('final-bono').textContent = J.gano && J.bono ? `(incluye ${formatoPuntos(J.bono)} de bono por rapidez y salud)` : '';
@@ -1012,7 +1144,8 @@ function manejarTecla(k) {
       if (k === 'enter' || k === 'escape') Rescate.terminar();
       break;
     case 'juego':
-      if (k === 'e' || k === 'enter') interactuar();
+      if (k === 'arrowup' || k === 'w' || k === ' ') pedirSalto();
+      else if (k === 'e' || k === 'enter') interactuar();
       else if (k === '1') usarConsumible('coco');
       else if (k === '2') usarConsumible('fruta');
       else if (k === 'escape' || k === 'p') pausar();
@@ -1048,6 +1181,7 @@ addEventListener('keydown', (ev) => {
   if (k === 'arrowleft' || k === 'a') teclas.izq = true;
   if (k === 'arrowright' || k === 'd') teclas.der = true;
   if (k === ' ') teclas.espacio = true;
+  if (k === 'arrowup' || k === 'w' || k === ' ') teclas.arriba = true;
   if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(k)) ev.preventDefault();
   if (ev.repeat) return;
   // 'a' mueve a la izquierda en el juego, pero en la tarjeta muestra los átomos
@@ -1059,14 +1193,15 @@ addEventListener('keyup', (ev) => {
   if (k === 'arrowleft' || k === 'a') teclas.izq = false;
   if (k === 'arrowright' || k === 'd') teclas.der = false;
   if (k === ' ') teclas.espacio = false;
+  if (k === 'arrowup' || k === 'w' || k === ' ') teclas.arriba = false;
 });
-addEventListener('blur', () => { teclas.izq = teclas.der = teclas.espacio = false; });
+addEventListener('blur', () => { teclas.izq = teclas.der = teclas.espacio = teclas.arriba = false; });
 addEventListener('pointerdown', marcarActividad);
 
 // Controles táctiles (celular / tablet)
 document.querySelectorAll('#tactil [data-mantener]').forEach(b => {
   const t = b.dataset.mantener;
-  const on = (ev) => { ev.preventDefault(); teclas[t] = true; marcarActividad(); };
+  const on = (ev) => { ev.preventDefault(); teclas[t] = true; marcarActividad(); if (t === 'arriba') pedirSalto(); };
   const off = () => { teclas[t] = false; };
   b.addEventListener('pointerdown', on);
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => b.addEventListener(n, off));
@@ -1085,13 +1220,14 @@ $('mini-lienzo').addEventListener('pointerdown', (ev) => {
 Sensores.alComando = (cmd) => {
   marcarActividad();
   if (J.estado === 'sensores') {
-    const nombres = { accion: 'recoger / usar', cerrar: 'listo', repetir: '¿qué es?', beber: 'beber', comer: 'comer', chispa: 'chispa', auxilio: 'auxilio', pausa: 'pausa' };
+    const nombres = { saltar: 'salta', accion: 'recoger / usar', cerrar: 'listo', repetir: '¿qué es?', beber: 'beber', comer: 'comer', chispa: 'chispa', auxilio: 'auxilio', pausa: 'pausa' };
     $('sens-voz-estado').textContent = `Te entendí: «${nombres[cmd] || cmd}» ✓`;
     Sonido.puntos();
   } else if (J.estado === 'mision') {
     if (cmd === 'accion' || cmd === 'cerrar') empezarAJugar();
   } else if (J.estado === 'juego') {
     if (cmd === 'accion') interactuar();
+    else if (cmd === 'saltar') pedirSalto(true);
     else if (cmd === 'beber') usarConsumible('coco');
     else if (cmd === 'comer') usarConsumible('fruta');
     else if (cmd === 'pausa') pausar();

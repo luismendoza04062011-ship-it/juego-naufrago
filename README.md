@@ -9,6 +9,8 @@ Videojuego educativo (*serious game*) para la **Feria de la Ciencia y la Tecnolo
 ## La historia
 Alek naufraga con el buque de investigación AURORA en una isla del Pacífico. Lo acompaña **BRISA**, una IA que escanea cada objeto que él recoge, le muestra **de qué átomos está hecho** y se lo explica **en voz alta**. Para ser rescatado debe cruzar la isla (playa → selva → campamento → cumbre), superar 3 retos científicos y encender la baliza S.O.S. antes de que su hidratación o su energía lleguen a 0. Al final, un **helicóptero de rescate** llega a la cumbre y sube a Alek con un cable (escena animada dentro del juego).
 
+**Plataformas y supervivencia:** cada zona es un nivel de plataformas con cámara que sigue a Alek. Hay que **saltar** huecos (mar, pantano, vacío), subir a cajas, rocas, troncos y puentes de bambú, y esquivar **cangrejos, serpientes, rocas que caen y ráfagas de viento** (a los animales se les puede saltar encima). Alek tiene **3 ❤️ de salud**, además del agua y la energía, y cada zona gasta distinto: el sol de la playa quita agua, la humedad de la selva y la altura de la cumbre cansan más, y el campamento es un refugio donde se recupera la salud. BRISA explica la ciencia de cada peligro la primera vez que aparece.
+
 **Para que se entienda fácil:** al empezar aparece la tarjeta *Tu misión* (BRISA la lee en voz alta); arriba siempre se ve el **👉 objetivo** actual y el mapa de las 4 zonas, y una flecha cian señala a dónde ir.
 
 **📱 Jugar en el celular:** el menú y la pantalla final muestran un **código QR**; los visitantes lo escanean y juegan de una vez.
@@ -31,7 +33,7 @@ Alek naufraga con el buque de investigación AURORA en una isla del Pacífico. L
 | ⚛️ Escáner atómico (13 objetos) | Moléculas en 3D (celulosa, SiO₂, PET, H₂O + NaCl, vitamina C, H₂SO₄, GaN, Fe₃O₄, red metálica del cobre) y modelo de Bohr de cada elemento (protones y capas de electrones). |
 
 ## Controles
-`←` `→` mover · `E` recoger / usar · `1` beber coco · `2` comer guayaba · `ESPACIO` soplar (si no hay micrófono) · `ESC` pausa · `F` pantalla completa.
+`←` `→` mover · `↑` / `W` / `ESPACIO` saltar (o decir «salta») · `E` recoger / usar · `1` beber coco · `2` comer guayaba · `ESC` pausa · `F` pantalla completa. En el reto del fuego, `ESPACIO` sopla si no hay micrófono.
 En el escáner: `A` ver átomo por átomo · `M` ver molécula · `R` repetir.
 En celular aparecen botones táctiles (girar a horizontal).
 
@@ -51,6 +53,7 @@ index.html        pantallas (menú, cinemática, sensores, juego, final)
 css/style.css     diseño "Scientific Survival HUD" (hecho en Google Stitch)
 js/data.js        TODO el contenido científico: objetos, átomos, moléculas, zonas, textos de BRISA
 js/game.js        motor Canvas 2D (60 FPS), zonas, objetivo, HUD, inventario, supervivencia
+js/nivel.js       niveles de plataformas: piso con huecos, plataformas, enemigos, rocas, viento y fondo con profundidad
 js/personajes.js  Alek (con articulaciones y poses), BRISA y el helicóptero, dibujados con Canvas
 js/rescate.js     escena animada del rescate en helicóptero
 js/minigames.js   los 3 retos científicos

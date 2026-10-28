@@ -2,36 +2,42 @@
 //  rescate.js → El final del juego, animado dentro del juego:
 //  la baliza se enciende, llega el helicóptero del buque Orión,
 //  baja un cable y sube a Alek. Dura unos 16 segundos (Enter lo salta).
+//  Las posiciones están en coordenadas del nivel (la cámara se mueve).
 // =====================================================================
 
 const Rescate = {
   activo: false,
   t: 0,
+  base: 0,           // posición de la cámara durante el rescate
+  suelo: 600,
   heli: { x: 0, y: 0, inclinacion: 0 },
   cable: 0,          // largo del cable (px)
   elevacion: 0,      // cuánto ha subido Alek (px)
-  esperaX: 830,      // lugar despejado donde Alek espera
+  esperaX: 0,        // lugar despejado donde Alek espera
   hitos: {},
   confeti: [],
 
   iniciar() {
     const p = J.jugador;
+    const baliza = J.estaciones.find(e => e.tipo === 'baliza');
     this.activo = true;
     this.t = 0;
     this.hitos = {};
     this.confeti = [];
     this.cable = 0;
     this.elevacion = 0;
-    this.heli = { x: ANCHO + 280, y: 70, inclinacion: -0.15 };
-    p.pose = null;
-    p.item = null;
-    p.oculto = false;
+    this.base = Math.max(0, Nivel.ancho - ANCHO);
+    this.suelo = Nivel.suelo;
+    this.esperaX = baliza.x + 280;
+    this.heli = { x: this.base + ANCHO + 280, y: 70, inclinacion: -0.15 };
+    Object.assign(p, { pose: null, item: null, oculto: false, y: this.suelo, vy: 0, enSuelo: true, empuje: 0 });
+    J.invulnerable = 0;
     J.estado = 'rescate';
     Sensores.callar();
     decir('¡La señal de auxilio salió! El buque Orión la recibió y envía su helicóptero de rescate.');
   },
 
-  // Dónde se engancha el cable en el helicóptero (coordenadas del mundo)
+  // Dónde se engancha el cable en el helicóptero
   gancho() {
     const h = this.heli, a = h.inclinacion;
     return { x: h.x + 16 * Math.cos(a) + 24 * Math.sin(a), y: h.y + 16 * Math.sin(a) - 24 * Math.cos(a) };
@@ -42,8 +48,9 @@ const Rescate = {
   actualizar(dt) {
     const t = (this.t += dt);
     const p = J.jugador;
-    const z = ZONAS[J.zonaIdx];
     const h = this.heli;
+    const inicioX = this.base + ANCHO + 280;
+    J.camX += (this.base - J.camX) * Math.min(1, dt * 3);
 
     // 1. Alek camina al claro y saluda (0–3 s)
     if (t < 8) {
@@ -63,7 +70,7 @@ const Rescate = {
     if (t >= 2) this.unaVez('rotor', () => { Sonido.iniciarRotor(); });
     if (t >= 2 && t < 11.5) {
       const u = suave((t - 2) / 4);
-      h.x = (ANCHO + 280) + (this.esperaX - 16 - (ANCHO + 280)) * u;
+      h.x = inicioX + (this.esperaX - 16 - inicioX) * u;
       h.y = 70 + (205 - 70) * u + Math.sin(t * 2) * 4;
       h.inclinacion = -0.15 * (1 - u) + Math.sin(t * 1.3) * 0.02;
       Sonido.volumenRotor(0.12 + 0.35 * u);
@@ -71,7 +78,7 @@ const Rescate = {
 
     // 3. Baja el cable (6–8 s)
     const g = this.gancho();
-    const manos = z.suelo - 214;           // altura de las manos con los brazos arriba
+    const manos = this.suelo - 188 * ESCALA_ALEK - 4;    // altura de las manos con los brazos arriba
     if (t >= 6) this.unaVez('cable', () => decir('Ya bajan el cable. ¡Agárrate fuerte, Alek!'));
     if (t >= 6 && t < 8) this.cable = (manos - g.y) * suave((t - 6) / 2);
 
@@ -103,8 +110,8 @@ const Rescate = {
     }
 
     // BRISA acompaña a Alek y al final entra al helicóptero
-    const bx = p.oculto ? g.x : p.x - p.dir * 58;
-    const by = p.oculto ? g.y : z.suelo - 205 - this.elevacion + Math.sin(J.t * 2.2) * 7;
+    const bx = p.oculto ? g.x : p.x - p.dir * 50;
+    const by = p.oculto ? g.y : this.suelo - 170 - this.elevacion + Math.sin(J.t * 2.2) * 7;
     J.brisa.x += (bx - J.brisa.x) * Math.min(1, dt * 3);
     J.brisa.y += (by - J.brisa.y) * Math.min(1, dt * 3);
 
@@ -115,26 +122,23 @@ const Rescate = {
     if (t >= 16) this.terminar();
   },
 
-  // Se dibuja encima del mundo (antes del HUD)
+  // Parte que se mueve con la cámara (se dibuja dentro del mundo)
   dibujar(c) {
     const t = this.t;
     const h = this.heli;
-    // atardecer que se oscurece
-    c.fillStyle = `rgba(10,20,45,${0.32 * suave(t / 3)})`;
-    c.fillRect(0, 0, ANCHO, ALTO);
+    c.fillStyle = `rgba(10,20,45,${0.32 * suave(t / 3)})`;      // atardecer que se oscurece
+    c.fillRect(J.camX, 0, ANCHO, ALTO);
     if (t >= 2) {
       // haz del reflector sobre Alek
       const fx = h.x - 92 * Math.cos(h.inclinacion), fy = h.y + 20;
       c.save();
       c.globalCompositeOperation = 'lighter';
-      const gr = c.createLinearGradient(fx, fy, fx, ZONAS[J.zonaIdx].suelo);
+      const gr = c.createLinearGradient(fx, fy, fx, this.suelo);
       gr.addColorStop(0, 'rgba(255,250,215,0.35)'); gr.addColorStop(1, 'rgba(255,250,215,0.05)');
       c.fillStyle = gr;
-      const suelo = ZONAS[J.zonaIdx].suelo;
-      c.beginPath(); c.moveTo(fx - 6, fy); c.lineTo(fx + 6, fy); c.lineTo(this.esperaX + 90, suelo); c.lineTo(this.esperaX - 70, suelo); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(fx - 6, fy); c.lineTo(fx + 6, fy); c.lineTo(this.esperaX + 90, this.suelo); c.lineTo(this.esperaX - 70, this.suelo); c.closePath(); c.fill();
       c.restore();
     }
-    // cable
     if (this.cable > 1 || (this.elevacion > 0 && !J.jugador.oculto)) {
       const g = this.gancho();
       const largo = this.elevacion > 0 ? Math.max(4, this.cable) : this.cable;
@@ -144,12 +148,15 @@ const Rescate = {
       c.beginPath(); c.arc(g.x, g.y + largo, 5, 0, Math.PI * 2); c.fill();
     }
     dibujarHelicoptero(c, h.x, h.y, J.t, h.inclinacion);
-    // confeti y título final
+  },
+
+  // Parte fija en la pantalla: confeti y título
+  dibujarPantalla(c) {
+    const t = this.t;
     this.confeti.forEach(q => { c.fillStyle = q.color; c.fillRect(q.x, q.y, 6, 9); });
     if (t >= 12) {
-      const a = Math.min(1, (t - 12) / 0.6);
       c.save();
-      c.globalAlpha = a;
+      c.globalAlpha = Math.min(1, (t - 12) / 0.6);
       c.textAlign = 'center'; c.textBaseline = 'middle';
       c.font = '700 84px "Space Grotesk", sans-serif';
       c.lineWidth = 8; c.strokeStyle = 'rgba(0,0,0,0.6)';

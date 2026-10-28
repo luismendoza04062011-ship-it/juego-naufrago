@@ -12,8 +12,10 @@ const CONFIG = {
 
   // Dificultad: segundos que tarda cada barra en bajar de 100 a 0
   // (solo baja mientras Alek explora; se detiene en tarjetas y retos).
-  segundosHidratacion: 120,
-  segundosEnergia: 160,
+  // (cada zona además multiplica estos gastos: ver «ambiente» en ZONAS)
+  segundosHidratacion: 150,
+  segundosEnergia: 190,
+  energiaPorSalto: 0.8, // saltar cansa
 
   velocidadAlek: 270, // píxeles por segundo
 
@@ -272,42 +274,78 @@ const OBJETOS = {
 };
 
 // ---------------------------------------------------------------------
-//  ZONAS DE LA ISLA (cada una es una pantalla)
-//  suelo = altura (en px) donde camina Alek
+//  ZONAS DE LA ISLA: niveles de plataformas
+//  ancho      = largo del nivel en píxeles (la cámara sigue a Alek)
+//  suelo      = altura del piso; huecos = tramos sin piso [desde, hasta]
+//  peligro    = lo que hay en los huecos (agua, lodo o abismo): caer quita 1 ❤️
+//  plataformas: [x izquierda, altura, ancho, tipo]  (caja, roca, tronco, rama)
+//  enemigos   : [tipo, desde, hasta]  → patrullan entre esas dos x
+//  ambiente   : cuánto más rápido se gasta el agua y la energía en esa zona
+//  objetos    : { id, x, y? } (sin y = en el piso)
 // ---------------------------------------------------------------------
 const ZONAS = [
   {
-    id: 'playa', nombre: 'PLAYA AURORA', corto: 'PLAYA', icono: '🏖️', hacia: 'la playa', fondo: 'assets/img/zona_playa.jpg', suelo: 612, lluvia: true,
-    mision: 'Explora la playa y recoge los objetos útiles que dejó el naufragio.',
-    intro: 'Estamos en la Playa Aurora. Busca los objetos que brillan en la arena, acércate y presiona E. Yo los escaneo y te digo de qué átomos están hechos.',
-    objetos: [{ id: 'madera', x: 250 }, { id: 'coco', x: 470 }, { id: 'botella', x: 690 }, { id: 'pedernal', x: 900 }, { id: 'aguamar', x: 1110 }]
+    id: 'playa', nombre: 'PLAYA AURORA', corto: 'PLAYA', icono: '🏖️', hacia: 'la playa', fondo: 'assets/img/zona_playa.jpg', lluvia: true,
+    ancho: 2560, suelo: 600, terreno: 'arena', peligro: 'agua',
+    huecos: [[700, 860], [1450, 1610]],
+    plataformas: [[540, 480, 110, 'caja'], [740, 445, 100, 'roca'], [1040, 470, 140, 'tronco'], [1230, 350, 110, 'caja'], [1500, 455, 100, 'roca'], [1760, 490, 90, 'caja'], [1880, 400, 150, 'tronco'], [2160, 480, 110, 'caja']],
+    enemigos: [['cangrejo', 260, 640], ['cangrejo', 900, 1420], ['cangrejo', 1640, 2100], ['cangrejo', 2200, 2480]],
+    ambiente: { texto: '☀️ Sol fuerte: pierdes agua más rápido', agua: 1.35, energia: 1 },
+    mision: 'Cruza la playa y recoge los objetos útiles que dejó el naufragio.',
+    intro: 'Estamos en la Playa Aurora. Busca los objetos que brillan, acércate y presiona E. Cuidado con los huecos y con los cangrejos: puedes saltarlos.',
+    objetos: [{ id: 'madera', x: 400 }, { id: 'botella', x: 1110, y: 470 }, { id: 'coco', x: 1285, y: 350 }, { id: 'pedernal', x: 1955, y: 400 }, { id: 'aguamar', x: 2380 }]
   },
   {
-    id: 'selva', nombre: 'SELVA PROFUNDA', corto: 'SELVA', icono: '🌴', hacia: 'la selva', fondo: 'assets/img/zona_selva.jpg', suelo: 628, lluvia: true, motas: true,
+    id: 'selva', nombre: 'SELVA PROFUNDA', corto: 'SELVA', icono: '🌴', hacia: 'la selva', fondo: 'assets/img/zona_selva.jpg', lluvia: true, motas: true,
+    ancho: 2560, suelo: 610, terreno: 'tierra', peligro: 'lodo',
+    huecos: [[640, 800], [1300, 1460], [1980, 2140]],
+    plataformas: [[300, 490, 120, 'rama'], [470, 380, 110, 'rama'], [680, 475, 90, 'roca'], [940, 490, 130, 'rama'], [1110, 380, 120, 'rama'], [1335, 480, 90, 'roca'], [1620, 490, 120, 'rama'], [1780, 375, 120, 'rama'], [2015, 470, 90, 'roca'], [2300, 490, 120, 'rama']],
+    enemigos: [['serpiente', 840, 1260], ['serpiente', 1490, 1940], ['serpiente', 2170, 2500]],
+    ambiente: { texto: '💦 Humedad: te cansas más rápido', agua: 1, energia: 1.25 },
     mision: 'Cruza la selva y consigue materiales vegetales.',
-    intro: 'Entramos a la selva. Aquí encontraremos fibras, hojas y frutas. Casi todos los seres vivos están hechos de los mismos tres elementos: carbono, hidrógeno y oxígeno.',
-    objetos: [{ id: 'yesca', x: 260 }, { id: 'liana', x: 500 }, { id: 'fruta', x: 760 }, { id: 'hoja', x: 1010 }]
+    intro: 'Entramos a la selva. Aquí hay fibras, hojas y frutas, pero también pantanos y serpientes. Casi todos los seres vivos están hechos de carbono, hidrógeno y oxígeno.',
+    objetos: [{ id: 'yesca', x: 200 }, { id: 'fruta', x: 525, y: 380 }, { id: 'liana', x: 1170, y: 380 }, { id: 'hoja', x: 1840, y: 375 }]
   },
   {
-    id: 'campamento', nombre: 'CAMPAMENTO', corto: 'CAMPAMENTO', icono: '⛺', hacia: 'el campamento', fondo: 'assets/img/zona_campamento.jpg', suelo: 618, lluvia: true,
+    id: 'campamento', nombre: 'CAMPAMENTO', corto: 'CAMPAMENTO', icono: '⛺', hacia: 'el campamento', fondo: 'assets/img/zona_campamento.jpg', lluvia: true,
+    ancho: 1280, suelo: 618, fondoFijo: true,
+    plataformas: [[560, 500, 130, 'caja']],
+    ambiente: { texto: '⛺ Refugio: aquí gastas menos agua y energía', agua: 0.45, energia: 0.45 },
     mision: 'Consigue agua potable y prende el fuego.',
-    intro: 'Este es un buen lugar para acampar. Primero consigamos agua potable con el destilador solar, a la izquierda. Después prendamos el fuego en el anillo de piedras, a la derecha.',
-    objetos: [{ id: 'coco', x: 700 }],
+    intro: 'Este es un buen lugar para acampar, y aquí recuperas tu salud. Primero consigamos agua potable con el destilador solar, a la izquierda. Después prendamos el fuego en el anillo de piedras, a la derecha.',
+    objetos: [{ id: 'coco', x: 625, y: 500 }],
     estaciones: [
       { tipo: 'agua', x: 235, marcaY: 300, nombre: 'DESTILADOR SOLAR', icono: '💧', requiere: ['botella', 'aguamar'], para: 'Para armar el destilador solar', pendiente: 'conseguir agua en el destilador solar' },
       { tipo: 'fuego', x: 1150, marcaY: 400, nombre: 'ANILLO DE PIEDRAS', icono: '🔥', requiere: ['madera', 'yesca', 'pedernal'], para: 'Para prender el fuego', pendiente: 'prender el fuego en el anillo de piedras' }
     ]
   },
   {
-    id: 'cumbre', nombre: 'CUMBRE DE LA ANTENA', corto: 'CUMBRE', icono: '📡', hacia: 'la cumbre', fondo: 'assets/img/zona_cumbre.jpg', suelo: 632, lluvia: false, viento: true,
+    id: 'cumbre', nombre: 'CUMBRE DE LA ANTENA', corto: 'CUMBRE', icono: '📡', hacia: 'la cumbre', fondo: 'assets/img/zona_cumbre.jpg', lluvia: false, viento: true,
+    ancho: 2560, suelo: 610, terreno: 'roca', peligro: 'abismo',
+    huecos: [[640, 820], [1360, 1530]],
+    plataformas: [[420, 480, 110, 'roca'], [690, 450, 90, 'roca'], [980, 490, 110, 'roca'], [1150, 380, 110, 'roca'], [1400, 460, 90, 'roca'], [1650, 480, 120, 'roca']],
+    rocas: [250, 1800],
+    ambiente: { texto: '🥶 Altura y viento: gastas más energía', agua: 1.1, energia: 1.3 },
     mision: 'Repara la baliza y envía la señal de auxilio.',
-    intro: 'Llegamos a la cumbre. La baliza de emergencia no tiene energía. Busca la batería, el cable de cobre y la lámpara para repararla.',
-    objetos: [{ id: 'lampara', x: 230 }, { id: 'bateria', x: 680 }, { id: 'magnetita', x: 860 }, { id: 'cobre', x: 1060 }],
+    intro: 'Llegamos a la cumbre. Aquí hay ráfagas de viento y caen rocas: mira las sombras en el suelo. La baliza de emergencia está al final. Busca la batería, el cable de cobre y la lámpara para repararla.',
+    objetos: [{ id: 'lampara', x: 300 }, { id: 'bateria', x: 1080 }, { id: 'magnetita', x: 1205, y: 380 }, { id: 'cobre', x: 1710, y: 480 }],
     estaciones: [
-      { tipo: 'baliza', x: 470, marcaY: 250, nombre: 'BALIZA DE EMERGENCIA', icono: '📡', requiere: ['bateria', 'cobre', 'lampara'], para: 'Para reparar la baliza', pendiente: 'reparar la baliza' }
+      { tipo: 'baliza', x: 2050, marcaY: 240, nombre: 'BALIZA DE EMERGENCIA', icono: '📡', requiere: ['bateria', 'cobre', 'lampara'], para: 'Para reparar la baliza', pendiente: 'reparar la baliza' }
     ]
   }
 ];
+
+// Lo que BRISA explica la primera vez que aparece cada peligro (ciencia de la supervivencia)
+const CONSEJOS = {
+  salto: '¡Buen salto! La gravedad te frena mientras subes y te trae de vuelta al suelo. Es la misma fuerza que mantiene a la Luna girando alrededor de la Tierra.',
+  cangrejo: '¡Cuidado con los cangrejos! Su caparazón es un exoesqueleto de quitina, endurecido con carbonato de calcio. Esquívalos o salta encima de ellos.',
+  serpiente: 'Una serpiente. La mayoría no son venenosas, pero nunca hay que tocarlas. Lo más seguro es mantener la distancia y pasar por encima.',
+  roca: '¡Rocas cayendo! Mira su sombra en el suelo y apártate. Mientras caen, la gravedad las acelera cada vez más.',
+  agua: 'El agua de mar te arrastra y te enfría. Es mejor cruzar por las rocas y los troncos.',
+  lodo: 'Es un pantano. El lodo atrapa los pies por succión y cuesta mucho salir. Pasa por encima.',
+  abismo: '¡Casi caes al vacío! Calcula bien la distancia antes de lanzarte.',
+  viento: 'Una ráfaga de viento. Mientras más rápido se mueve el aire, más fuerte empuja. Espera a que se calme o avanza con cuidado.'
+};
 
 // Objetos opcionales: no bloquean el avance (los consumibles y el bonus)
 const OPCIONALES = ['coco', 'fruta', 'magnetita'];
@@ -324,13 +362,15 @@ const ESCENAS_INTRO = [
 
 const ESCENAS_DERROTA = {
   hidratacion: [{ img: 'assets/img/menu.jpg', filtro: 'grayscale(.7) sepia(.5) hue-rotate(-25deg) brightness(.55)', texto: 'Hidratación crítica. Sin agua potable, el cuerpo humano no puede seguir funcionando. Alek se desmaya sobre la arena.' }],
-  energia: [{ img: 'assets/img/cine_selva.jpg', filtro: 'grayscale(.7) sepia(.4) hue-rotate(-25deg) brightness(.5)', texto: 'Energía agotada. Sin alimento ni calor, el cuerpo gasta todas sus reservas. Alek ya no tiene fuerzas para seguir caminando.' }]
+  energia: [{ img: 'assets/img/cine_selva.jpg', filtro: 'grayscale(.7) sepia(.4) hue-rotate(-25deg) brightness(.5)', texto: 'Energía agotada. Sin alimento ni calor, el cuerpo gasta todas sus reservas. Alek ya no tiene fuerzas para seguir caminando.' }],
+  heridas: [{ img: 'assets/img/zona_cumbre.jpg', filtro: 'grayscale(.7) sepia(.4) hue-rotate(-25deg) brightness(.5)', texto: 'Demasiados golpes y caídas. Con el cuerpo herido, Alek ya no puede seguir explorando la isla.' }]
 };
 
 // Datos científicos para la pantalla final
 const DATOS_FINALES = {
   hidratacion: 'Cerca del 60 % de tu cuerpo es agua. Si pierdes apenas un 2 %, ya te cuesta concentrarte y tienes menos fuerza. Por eso, en una emergencia, conseguir agua potable es lo primero, incluso antes que la comida. Y nunca agua de mar: la sal te deshidrata todavía más.',
   energia: 'Tus células obtienen energía de la glucosa mediante la respiración celular: la glucosa reacciona con el oxígeno y produce dióxido de carbono, agua y energía. Si no comes ni te mantienes caliente, el cuerpo gasta sus reservas hasta agotarse.',
+  heridas: 'En una emergencia, evitar lesiones también es sobrevivir: una caída o una mordida pueden impedirte buscar agua y comida. Por eso los rescatistas siguen una regla: antes de saltar o cruzar, observa el terreno.',
   victoria: 'Usaste tres ideas de la ciencia: los cambios de fase, para obtener agua dulce; el triángulo del fuego, para tener calor; y la ley de Ohm, para encender la baliza. Así es como la ciencia salva vidas.'
 };
 

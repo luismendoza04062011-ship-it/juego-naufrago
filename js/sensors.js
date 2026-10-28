@@ -19,6 +19,7 @@ const COMANDOS_VOZ = [
   { cmd: 'repetir', frases: ['que es', 'analizar', 'analiza', 'explica', 'repite', 'repetir', 'otra vez'] },
   { cmd: 'cerrar', frases: ['listo', 'lista', 'cerrar', 'cierra', 'siguiente', 'continuar', 'vale', 'okay'] },
   { cmd: 'chispa', frases: ['chispa', 'golpe', 'golpear', 'golpea'] },
+  { cmd: 'saltar', frases: ['salta', 'saltar', 'salto', 'brinca', 'arriba'] },
   { cmd: 'auxilio', frases: ['auxilio', 'sos', 's o s', 'ayuda', 'socorro', 'mayday'] },
   { cmd: 'accion', frases: ['recoger', 'recoge', 'recojo', 'agarrar', 'agarra', 'coger', 'coge', 'tomar', 'toma', 'usar', 'usa', 'construir', 'encender', 'enciende', 'reparar', 'repara'] },
   { cmd: 'pausa', frases: ['pausa', 'pausar'] }
