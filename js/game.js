@@ -90,9 +90,10 @@ function nuevaPartida() {
     inventario: {}, descubiertos: new Set(), retos: { agua: false, fuego: false, baliza: false },
     flotantes: [], particulas: [], lluvia: [], motas: [], fundido: null, cercano: null,
     avisoHidr: false, avisoEnerg: false, ultimoAvisoSalida: 0, guardado: false, miRecord: null,
-    causa: null, gano: false, pasoT: 0, crepT: 0
+    causa: null, gano: false, pasoT: 0, crepT: 0,
+    tutorial: { recorrido: 0, recogio: false }, recogiendo: null
   });
-  J.jugador = { x: 70, dir: 1, fase: 0, mov: false };
+  J.jugador = { x: 70, dir: 1, fase: 0, mov: false, pose: null, poseT: 0, item: null, oculto: false };
   J.brisa = { x: 20, y: 440 };
   cargarZona(0);
   pintarInventario();
@@ -125,15 +126,26 @@ function comenzarMision() {
   Sonido.contexto();
   nuevaPartida();
   mostrarPantalla('pantalla-juego');
-  J.estado = 'juego';
   marcarActividad();
+  // Antes de jugar se explica la misión en una tarjeta (y BRISA la lee)
+  J.estado = 'mision';
+  $('ov-mision').classList.add('visible');
+  Sensores.hablar('Tu misión: llegar a la cumbre de la isla y pedir rescate. Recoge los objetos que brillan, supera tres retos científicos y no dejes que tu agua o tu energía lleguen a cero.');
+}
+
+function empezarAJugar() {
+  if (J.estado !== 'mision') return;
+  $('ov-mision').classList.remove('visible');
+  Sonido.click();
+  J.estado = 'juego';
   anunciarZona();
 }
 
 function irAlMenu() {
   Sensores.callar();
   if (Cinematica.activa) { Cinematica.alTerminar = null; Cinematica.fin(); }
-  ['ov-tarjeta', 'ov-mini', 'ov-pausa', 'ov-ayuda'].forEach(id => $(id).classList.remove('visible'));
+  Rescate.cancelar();
+  ['ov-tarjeta', 'ov-mini', 'ov-pausa', 'ov-ayuda', 'ov-mision'].forEach(id => $(id).classList.remove('visible'));
   if (Tarjeta.visor) Tarjeta.visor.detener();
   clearInterval(Tarjeta.karaoke);
   Minijuego.tipo = null;
@@ -157,22 +169,35 @@ function buscarCercano() {
 }
 
 function interactuar() {
-  if (J.fundido) return;
+  if (J.fundido || J.jugador.pose === 'recoger') return;
   const c = J.cercano;
   if (!c) { decir('No hay nada cerca. Acércate a un objeto que brille.', false); Sonido.error(); return; }
   if (c.tipo === 'objeto') recoger(c.ref);
   else usarEstacion(c.ref);
 }
 
+// Alek se agacha, BRISA escanea el objeto y él lo levanta (1 segundo).
+// Al terminar la animación se guarda el objeto (terminarRecoger).
 function recoger(o) {
-  const def = OBJETOS[o.id];
+  const p = J.jugador;
   o.recogido = true;
+  J.recogiendo = o;
+  J.tutorial.recogio = true;
+  p.dir = o.x >= p.x ? 1 : -1;
+  p.mov = false;
+  p.pose = 'recoger';
+  p.poseT = 0;
+  p.item = null;
+  Sonido.escaneo();
+}
+
+function terminarRecoger(o) {
+  const def = OBJETOS[o.id];
   J.inventario[o.id] = (J.inventario[o.id] || 0) + 1;
   pintarInventario();
   if (!J.descubiertos.has(o.id)) {
     J.descubiertos.add(o.id);
     pintarMision();
-    sumarPuntos(100, o.x, ZONAS[J.zonaIdx].suelo - 120, 'DESCUBRIMIENTO');
     Tarjeta.abrir(o.id, true);
   } else {
     Sonido.recoger();
@@ -222,10 +247,13 @@ function completarReto(e) {
   const y = ZONAS[J.zonaIdx].suelo - 160;
   if (e.tipo === 'baliza') {
     sumarPuntos(500, e.x, y, 'S.O.S.');
-    victoria();
+    pintarMision();
+    Rescate.iniciar();
     return;
   }
   J.estado = 'juego';
+  J.jugador.pose = 'celebrar';
+  J.jugador.poseT = 0;
   if (e.tipo === 'agua') {
     consumir('aguamar');
     J.hidr = Math.min(100, J.hidr + 50);
@@ -265,6 +293,28 @@ function faltantesZona() {
   return { objetos, retos, total: objetos.length + retos.length };
 }
 
+// El siguiente paso más claro para el jugador: lo que se muestra arriba
+// ("👉 Recoge la madera") y dónde apunta la flecha del mundo.
+function objetivoActual() {
+  const z = ZONAS[J.zonaIdx];
+  const p = J.jugador;
+  const pendientes = J.objetos.filter(o => !o.recogido);
+  if (pendientes.length) {
+    const o = pendientes.reduce((a, b) => Math.abs(a.x - p.x) <= Math.abs(b.x - p.x) ? a : b);
+    return { texto: `Recoge ${OBJETOS[o.id].art}`, x: o.x, y: z.suelo - 105 };
+  }
+  const estacion = J.estaciones.find(e => !J.retos[e.tipo]);
+  if (estacion) {
+    const verbo = { agua: 'Usa el destilador solar', fuego: 'Prende el fuego en el anillo de piedras', baliza: 'Repara la baliza' }[estacion.tipo];
+    return { texto: verbo, x: estacion.x, y: estacion.marcaY - 40 };
+  }
+  if (J.zonaIdx < ZONAS.length - 1) {
+    const sig = ZONAS[J.zonaIdx + 1];
+    return { texto: `Camina a la derecha hacia ${sig.hacia} →`, x: ANCHO - 70, y: z.suelo - 120, salida: true };
+  }
+  return null;
+}
+
 function intentarSalir() {
   const p = J.jugador;
   if (J.zonaIdx >= ZONAS.length - 1) { p.x = ANCHO - 34; return; }
@@ -292,13 +342,12 @@ function derrota(causa) {
   setTimeout(() => { J.estado = 'cine'; Cinematica.reproducir(ESCENAS_DERROTA[causa], mostrarFinal); }, 900);
 }
 
+// Se llama al terminar la escena del rescate (rescate.js)
 function victoria() {
-  J.estado = 'cine';
   J.gano = true;
   J.bono = Math.max(0, Math.round((480 - J.tiempo) * 5)) + Math.round(J.hidr + J.energia);
   J.puntos += J.bono;
-  Sonido.victoria();
-  Cinematica.reproducir(ESCENAS_VICTORIA, mostrarFinal);
+  mostrarFinal();
 }
 
 function pausar() {
@@ -443,7 +492,22 @@ function actualizarHUD() {
   ponerTexto('hud-hidr-num', Math.ceil(Math.max(0, J.hidr)) + '%');
   ponerAncho('hud-energ', J.energia);
   ponerTexto('hud-energ-num', Math.ceil(Math.max(0, J.energia)) + '%');
-  ponerTexto('hud-zona', `ZONA ${J.zonaIdx + 1}/${ZONAS.length} · ${ZONAS[J.zonaIdx].nombre}`);
+  // mapa de las 4 zonas: ✓ las superadas, resaltada la actual
+  const mapa = ZONAS.map((z, i) => `${i < J.zonaIdx ? '✓' : ''}${z.icono}${i === J.zonaIdx ? ' ' + z.corto : ''}`).join('  ›  ');
+  if (cacheHUD.mapa !== mapa) {
+    cacheHUD.mapa = mapa;
+    $('hud-mapa').innerHTML = ZONAS.map((z, i) => `<span class="${i < J.zonaIdx ? 'hecha' : i === J.zonaIdx ? 'actual' : ''}">${i < J.zonaIdx ? '✓ ' : ''}${z.icono}${i === J.zonaIdx ? ' ' + z.corto : ''}</span>`).join('<i>›</i>');
+  }
+  // objetivo actual
+  const obj = J.estado === 'rescate' ? { texto: '¡Lo lograste! El helicóptero viene por Alek' } : objetivoActual();
+  const textoObj = obj ? obj.texto : '';
+  if (cacheHUD.objetivo !== textoObj) {
+    cacheHUD.objetivo = textoObj;
+    const el = $('hud-objetivo');
+    el.querySelector('span').textContent = textoObj;
+    el.classList.toggle('oculto', !textoObj);
+    el.classList.remove('cambio'); void el.offsetWidth; el.classList.add('cambio');
+  }
   ponerTexto('hud-tiempo', '⏱ ' + formatoTiempo(J.tiempo));
   ponerTexto('hud-puntos', '★ ' + formatoPuntos(J.puntos));
   $('hud-mic-nivel').style.width = Math.round(Sensores.intensidad() * 100) + '%';
@@ -468,7 +532,7 @@ function pintarMision() {
     const li = document.createElement('li');
     const ok = J.descubiertos.has(o.id);
     const opcional = OPCIONALES.includes(o.id);
-    li.textContent = `${ok ? '✓' : opcional ? '☆' : '○'} ${OBJETOS[o.id].emoji} ${ok ? OBJETOS[o.id].corto : '???'}`;
+    li.textContent = `${ok ? '✓' : opcional ? '☆' : '○'} ${OBJETOS[o.id].emoji} ${OBJETOS[o.id].corto}${opcional && !ok ? ' (extra)' : ''}`;
     li.className = ok ? 'ok' : '';
     ul.append(li);
   });
@@ -508,12 +572,35 @@ function actualizarJuego(dt) {
     f.a += f.dir * dt * 2.4;
     if (f.dir === 1 && f.a >= 1) { f.a = 1; f.dir = -1; f.alMedio(); }
     if (f.dir === -1 && f.a <= 0) J.fundido = null;
+  } else if (p.pose === 'recoger') {
+    // animación de recoger: se agacha, el objeto llega a su mano y lo levanta
+    const antes = p.poseT;
+    p.poseT += dt / 1.0;
+    const o = J.recogiendo;
+    if (antes < 0.35 && p.poseT >= 0.35) {
+      p.item = OBJETOS[o.id].emoji;
+      Sonido.recoger();
+      for (let k = 0; k < 18; k++) J.particulas.push({ x: o.x, y: z.suelo - 40, vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 220, r: 2 + Math.random() * 2, vida: 0.7, vidaMax: 0.7, chispa: true });
+    }
+    if (antes < 0.6 && p.poseT >= 0.6 && !J.descubiertos.has(o.id)) sumarPuntos(100, p.x, z.suelo - 250, 'DESCUBRIMIENTO');
+    if (p.poseT >= 1) {
+      p.pose = null;
+      p.item = null;
+      J.recogiendo = null;
+      terminarRecoger(o);
+    }
   } else {
-    // movimiento
-    const dir = (teclas.der ? 1 : 0) - (teclas.izq ? 1 : 0);
+    if (p.pose === 'celebrar') {
+      p.poseT += dt;
+      if (p.poseT > 1.4) p.pose = null;
+    }
+    // movimiento (más lento si está cansado)
+    const dir = p.pose ? 0 : (teclas.der ? 1 : 0) - (teclas.izq ? 1 : 0);
     p.mov = dir !== 0;
     if (dir) p.dir = dir;
-    p.x += dir * CONFIG.velocidadAlek * dt;
+    const cansado = J.hidr < 25 || J.energia < 25;
+    p.x += dir * CONFIG.velocidadAlek * (cansado ? 0.75 : 1) * dt;
+    J.tutorial.recorrido += Math.abs(dir * CONFIG.velocidadAlek * dt);
     if (p.x < 40) p.x = 40;
     if (p.x > ANCHO - 30) intentarSalir();
   }
@@ -543,7 +630,7 @@ function actualizarJuego(dt) {
   J.brisa.x += (objetivoX - J.brisa.x) * Math.min(1, dt * 3);
   J.brisa.y += (objetivoY - J.brisa.y) * Math.min(1, dt * 3);
 
-  J.cercano = J.fundido ? null : buscarCercano();
+  J.cercano = J.fundido || p.pose === 'recoger' ? null : buscarCercano();
 
   // partículas: fuego del campamento, lluvia, motas
   if (z.id === 'campamento' && J.retos.fuego) {
@@ -605,16 +692,49 @@ function dibujarMundo() {
   }
   J.particulas.forEach(q => {
     const a = q.vida / q.vidaMax;
-    c.fillStyle = q.fuego ? `rgba(255,${120 + 100 * a | 0},40,${0.85 * a})` : `rgba(255,255,255,${a})`;
+    c.fillStyle = q.fuego ? `rgba(255,${120 + 100 * a | 0},40,${0.85 * a})` : q.chispa ? `rgba(0,229,255,${a})` : `rgba(255,255,255,${a})`;
     c.beginPath(); c.arc(q.x, q.y, q.r * (0.5 + a * 0.5), 0, Math.PI * 2); c.fill();
   });
+
+  // baliza encendida en la cumbre (después de reparar el circuito)
+  if (z.id === 'cumbre' && J.retos.baliza) dibujarLuzBaliza(c, t);
 
   J.estaciones.forEach(e => dibujarEstacion(c, e, z, t));
   J.objetos.forEach(o => { if (!o.recogido) dibujarObjeto(c, o, z, t); });
 
   const p = J.jugador;
-  dibujarAlek(c, p.x, z.suelo, p.dir, p.fase, p.mov, t);
+  // mientras Alek se agacha, BRISA escanea el objeto con un rayo
+  if (p.pose === 'recoger' && J.recogiendo && p.poseT < 0.35) {
+    const o = J.recogiendo;
+    const oy = z.suelo - 40 - p.poseT * 40;
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = 'rgba(0,229,255,0.28)';
+    c.beginPath(); c.moveTo(J.brisa.x, J.brisa.y); c.lineTo(o.x - 26, oy + 20); c.lineTo(o.x + 26, oy + 20); c.closePath(); c.fill();
+    c.restore();
+    c.font = `46px ${FUENTE_EMOJI}`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(OBJETOS[o.id].emoji, o.x, oy);
+  }
+  if (!p.oculto) {
+    const elevacion = J.estado === 'rescate' ? Rescate.elevacion : 0;
+    dibujarAlek(c, p.x, z.suelo - elevacion, {
+      dir: p.dir, fase: p.fase, mov: p.mov, t, pose: p.pose, poseT: p.poseT, item: p.item,
+      cansado: J.estado === 'juego' && (J.hidr < 25 || J.energia < 25), elevado: elevacion > 2
+    });
+  }
   dibujarDron(c, J.brisa.x, J.brisa.y, 1, t, p.dir);
+  if (J.estado === 'rescate') Rescate.dibujar(c);
+
+  // guía para jugar: flecha sobre el objetivo y ayuda de cómo caminar
+  if (J.estado === 'juego' && !p.pose) {
+    const obj = objetivoActual();
+    if (obj && !obj.salida && Math.abs(obj.x - p.x) > 90) flechaObjetivo(c, obj.x, obj.y, t);
+    if (J.zonaIdx === 0 && J.tutorial.recorrido < 140 && !J.tutorial.recogio && !J.cercano) {
+      const tactil = matchMedia('(pointer: coarse)').matches;
+      burbuja(c, p.x, z.suelo - 232, tactil ? 'Camina con los botones ◀ ▶' : 'Camina con las flechas ← →');
+    }
+  }
 
   // lluvia real (si en el colegio está lloviendo)
   if (J.lluvia.length) {
@@ -639,7 +759,7 @@ function dibujarMundo() {
     const ref = J.cercano.ref;
     if (J.cercano.tipo === 'objeto') {
       const conocido = J.descubiertos.has(ref.id);
-      etiqueta(c, ref.x, z.suelo - 150, conocido ? OBJETOS[ref.id].nombre : 'OBJETO SIN IDENTIFICAR', '[E] RECOGER · o di «recoger»', '#00e5ff');
+      etiqueta(c, ref.x, z.suelo - 236, OBJETOS[ref.id].nombre, conocido ? '[E] RECOGER OTRO' : '[E] RECOGER Y ESCANEAR · o di «recoger»', '#00e5ff');
     } else if (J.retos[ref.tipo]) {
       etiqueta(c, ref.x, ref.marcaY - 70, ref.nombre, '✓ RETO SUPERADO', '#6fdc8c');
     } else {
@@ -727,94 +847,45 @@ function etiqueta(c, x, y, titulo, sub, color) {
   c.fillText(sub, bx + 15, by + 43);
 }
 
-// Alek dibujado con formas de Canvas (sin imágenes), con ciclo de caminata
-function dibujarAlek(c, x, y, dir, fase, mov, t) {
+// Flecha que rebota sobre el siguiente objetivo
+function flechaObjetivo(c, x, y, t) {
+  const by = y - 30 + Math.sin(t * 6) * 7;
   c.save();
-  c.translate(x, y);
-  c.fillStyle = 'rgba(0,0,0,0.38)';
-  c.beginPath(); c.ellipse(0, 0, 34, 8, 0, 0, Math.PI * 2); c.fill();
-  c.scale(dir * 1.2, 1.2);
-  const s = mov ? Math.sin(fase) : 0;
-  const rebote = mov ? Math.abs(Math.cos(fase)) * 3 : Math.sin(t * 2) * 1;
-  c.translate(0, -rebote);
-  c.lineWidth = 2;
-  c.strokeStyle = '#15100c';
-  c.lineJoin = 'round';
-
-  const pierna = (ang, pantalon, bota) => {
-    c.save(); c.translate(0, -68); c.rotate(ang);
-    c.fillStyle = pantalon; rr(c, -8, 0, 16, 54, 6); c.fill(); c.stroke();
-    c.fillStyle = bota; rr(c, -9, 48, 24, 14, 4); c.fill(); c.stroke();
-    c.restore();
-  };
-  const brazo = (ang, manga, reloj) => {
-    c.save(); c.translate(0, -116); c.rotate(ang);
-    c.fillStyle = manga; rr(c, -6, 0, 12, 36, 6); c.fill(); c.stroke();
-    c.fillStyle = '#c68e64'; c.beginPath(); c.arc(0, 40, 5.5, 0, Math.PI * 2); c.fill(); c.stroke();
-    if (reloj) {
-      c.fillStyle = '#0d1114'; c.fillRect(-6, 28, 12, 7);
-      c.shadowColor = '#00e5ff'; c.shadowBlur = 12;
-      c.fillStyle = '#00e5ff'; c.fillRect(-4, 30, 8, 3);
-      c.shadowBlur = 0;
-    }
-    c.restore();
-  };
-
-  pierna(-s * 0.55, '#6c6446', '#3a2a1d');
-  brazo(s * 0.6, '#2c3338', false);
-  c.fillStyle = '#6b4a2e'; rr(c, -29, -120, 15, 42, 5); c.fill(); c.stroke();          // mochila
-  c.fillStyle = '#3a4147'; rr(c, -15, -124, 30, 62, 8); c.fill(); c.stroke();          // camisa
-  c.fillStyle = '#55603a'; rr(c, -16, -120, 32, 46, 6); c.fill(); c.stroke();          // chaleco
-  c.fillStyle = '#465030';
-  [[-12, -104], [3, -104], [-12, -90], [3, -90]].forEach(([a, b]) => c.fillRect(a, b, 10, 9)); // bolsillos
-  c.strokeStyle = '#4a3420'; c.lineWidth = 3;
-  c.beginPath(); c.moveTo(-14, -120); c.lineTo(6, -78); c.stroke();                  // correa
-  c.lineWidth = 2; c.strokeStyle = '#15100c';
-  c.fillStyle = '#2b2016'; c.fillRect(-15, -68, 30, 6);                                // cinturón
-  pierna(s * 0.55, '#857a57', '#4a3424');
-  c.fillStyle = '#b97f57'; c.fillRect(-4, -131, 9, 9);                                 // cuello
-  c.fillStyle = '#c68e64'; c.beginPath(); c.arc(2, -142, 13, 0, Math.PI * 2); c.fill(); c.stroke(); // cabeza
-  c.beginPath(); c.moveTo(14, -145); c.lineTo(18, -139); c.lineTo(13, -138); c.fill(); // nariz
-  c.fillStyle = '#111'; c.beginPath(); c.arc(9, -144, 1.8, 0, Math.PI * 2); c.fill();  // ojo
-  c.strokeStyle = '#21160e'; c.beginPath(); c.moveTo(6, -149); c.lineTo(12, -149); c.stroke(); // ceja
-  c.fillStyle = '#b97f57'; c.beginPath(); c.arc(-3, -141, 3.5, 0, Math.PI * 2); c.fill(); // oreja
-  c.fillStyle = '#21160e';                                                              // pelo despeinado
-  c.beginPath(); c.arc(1, -145, 14, Math.PI * 0.95, Math.PI * 1.95); c.fill();
-  c.beginPath();
-  c.moveTo(-13, -146); c.lineTo(-19, -152); c.lineTo(-11, -153); c.lineTo(-12, -161); c.lineTo(-3, -157);
-  c.lineTo(0, -164); c.lineTo(5, -157); c.lineTo(13, -161); c.lineTo(12, -152); c.lineTo(17, -148); c.lineTo(9, -151); c.lineTo(-8, -150);
-  c.closePath(); c.fill();
-  c.beginPath(); c.moveTo(-12, -147); c.lineTo(-14, -134); c.lineTo(-6, -138); c.closePath(); c.fill();
-  c.strokeStyle = '#15100c';
-  brazo(-s * 0.6, '#3a4147', true);
+  c.shadowColor = 'rgba(0,229,255,0.9)';
+  c.shadowBlur = 14;
+  c.fillStyle = '#00e5ff';
+  c.beginPath(); c.moveTo(x - 15, by - 18); c.lineTo(x + 15, by - 18); c.lineTo(x, by); c.closePath(); c.fill();
   c.restore();
 }
 
-// BRISA: dron esférico flotante con ojo cian y anillo giratorio
-function dibujarDron(c, x, y, escala, t, dir) {
+// Globo de ayuda sobre la cabeza de Alek
+function burbuja(c, x, y, texto) {
+  c.font = '700 17px "Chivo", sans-serif';
+  const w = c.measureText(texto).width + 32, h = 40;
+  const bx = limitar(x - w / 2, 10, ANCHO - w - 10), by = y - h;
+  c.fillStyle = 'rgba(255,255,255,0.95)';
+  rr(c, bx, by, w, h, 10); c.fill();
+  c.beginPath(); c.moveTo(x - 9, by + h); c.lineTo(x + 9, by + h); c.lineTo(x, by + h + 12); c.closePath(); c.fill();
+  c.fillStyle = '#0f1417';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(texto, bx + w / 2, by + h / 2 + 1);
+}
+
+// Luz giratoria de la baliza en lo alto de la antena
+function dibujarLuzBaliza(c, t) {
+  const lx = 440, ly = 118;
   c.save();
-  c.translate(x, y);
-  c.scale(escala, escala);
-  const halo = c.createRadialGradient(0, 0, 4, 0, 0, 34);
-  halo.addColorStop(0, 'rgba(0,229,255,0.35)'); halo.addColorStop(1, 'rgba(0,229,255,0)');
-  c.fillStyle = halo; c.beginPath(); c.arc(0, 0, 34, 0, Math.PI * 2); c.fill();
-  const giro = Math.sin(t * 3) * 0.15;
-  c.strokeStyle = 'rgba(0,229,255,0.85)'; c.lineWidth = 2;
-  c.beginPath(); c.ellipse(0, 3, 23, 6, giro, Math.PI, Math.PI * 2); c.stroke();          // anillo (atrás)
-  c.fillStyle = '#9aa7ad';
-  c.beginPath(); c.moveTo(-10, 8); c.lineTo(-16, 16); c.lineTo(-6, 11); c.fill();
-  c.beginPath(); c.moveTo(10, 8); c.lineTo(16, 16); c.lineTo(6, 11); c.fill();
-  const cuerpo = c.createRadialGradient(-4, -5, 2, 0, 0, 14);
-  cuerpo.addColorStop(0, '#ffffff'); cuerpo.addColorStop(0.7, '#cfd8dc'); cuerpo.addColorStop(1, '#6f7c83');
-  c.fillStyle = cuerpo; c.beginPath(); c.arc(0, 0, 13, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = '#263238'; c.lineWidth = 2;
-  c.beginPath(); c.arc(0, 0, 13, Math.PI * 0.1, Math.PI * 0.9); c.stroke();
-  c.shadowColor = '#00e5ff'; c.shadowBlur = 14;
-  c.fillStyle = '#00e5ff'; c.beginPath(); c.arc(dir * 5, -1, 4.6, 0, Math.PI * 2); c.fill();
-  c.shadowBlur = 0;
-  c.fillStyle = '#ffffff'; c.beginPath(); c.arc(dir * 5 + 1.4, -2.4, 1.3, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(0,229,255,0.85)'; c.lineWidth = 2;
-  c.beginPath(); c.ellipse(0, 3, 23, 6, giro, 0, Math.PI); c.stroke();                   // anillo (adelante)
+  c.globalCompositeOperation = 'lighter';
+  const ang = t * 1.6;
+  const haz = c.createRadialGradient(lx, ly, 4, lx, ly, 700);
+  haz.addColorStop(0, 'rgba(220,255,255,0.45)'); haz.addColorStop(1, 'rgba(220,255,255,0)');
+  c.fillStyle = haz;
+  c.beginPath(); c.moveTo(lx, ly); c.arc(lx, ly, 700, ang - 0.12, ang + 0.12); c.closePath(); c.fill();
+  const brillo = 0.6 + 0.4 * Math.sin(t * 10);
+  const halo = c.createRadialGradient(lx, ly, 2, lx, ly, 60);
+  halo.addColorStop(0, `rgba(255,255,255,${brillo})`); halo.addColorStop(1, 'rgba(0,229,255,0)');
+  c.fillStyle = halo;
+  c.beginPath(); c.arc(lx, ly, 60, 0, Math.PI * 2); c.fill();
   c.restore();
 }
 
@@ -827,7 +898,7 @@ function mostrarFinal() {
   pf.classList.toggle('gano', J.gano);
   pf.classList.toggle('perdio', !J.gano);
   const fondo = $('final-fondo');
-  fondo.style.backgroundImage = `url(${J.gano ? 'assets/img/cine_rescate.jpg' : 'assets/img/menu.jpg'})`;
+  fondo.style.backgroundImage = `url(${J.gano ? 'assets/img/cine_baliza.jpg' : 'assets/img/menu.jpg'})`;
   fondo.style.filter = J.gano ? '' : 'grayscale(.7) sepia(.4) hue-rotate(-25deg) brightness(.6)';
   $('final-eyebrow').textContent = J.gano ? 'Estado de la operación: éxito total' : 'Estado de la operación: señal vital perdida';
   $('final-titulo').textContent = J.gano ? '¡RESCATADO! Sobreviviste con ciencia' : (J.causa === 'hidratacion' ? 'DESHIDRATACIÓN SEVERA' : 'ENERGÍA AGOTADA');
@@ -934,6 +1005,12 @@ function manejarTecla(k) {
   marcarActividad();
   if (k === 'f') { alternarPantallaCompleta(); return; }
   switch (J.estado) {
+    case 'mision':
+      if (k === 'e' || k === 'enter' || k === ' ') empezarAJugar();
+      break;
+    case 'rescate':
+      if (k === 'enter' || k === 'escape') Rescate.terminar();
+      break;
     case 'juego':
       if (k === 'e' || k === 'enter') interactuar();
       else if (k === '1') usarConsumible('coco');
@@ -1011,6 +1088,8 @@ Sensores.alComando = (cmd) => {
     const nombres = { accion: 'recoger / usar', cerrar: 'listo', repetir: '¿qué es?', beber: 'beber', comer: 'comer', chispa: 'chispa', auxilio: 'auxilio', pausa: 'pausa' };
     $('sens-voz-estado').textContent = `Te entendí: «${nombres[cmd] || cmd}» ✓`;
     Sonido.puntos();
+  } else if (J.estado === 'mision') {
+    if (cmd === 'accion' || cmd === 'cerrar') empezarAJugar();
   } else if (J.estado === 'juego') {
     if (cmd === 'accion') interactuar();
     else if (cmd === 'beber') usarConsumible('coco');
@@ -1070,6 +1149,16 @@ $('btn-probar-voz').addEventListener('click', () => {
   $('sens-tts-estado').textContent = Sensores.tts.voz ? `Voz: ${Sensores.tts.voz.name}` : 'Voz del sistema';
 });
 $('btn-comenzar').addEventListener('click', comenzarMision);
+$('btn-empezar').addEventListener('click', empezarAJugar);
+
+// Código QR para que los visitantes abran el juego en su celular
+function pintarQR(id, tamano) {
+  const el = $(id);
+  if (!el || typeof QRCode === 'undefined') return;
+  try {
+    new QRCode(el, { text: CONFIG.urlPublica, width: tamano, height: tamano, colorDark: '#0f1417', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  } catch (e) { /* sin QR: queda visible la dirección escrita */ }
+}
 
 $('btn-guardar-obj').addEventListener('click', () => Tarjeta.cerrar());
 $('btn-continuar').addEventListener('click', reanudar);
@@ -1100,6 +1189,7 @@ function bucle(ahora) {
   Sensores.actualizar(dt);
 
   if (J.estado === 'juego') actualizarJuego(dt);
+  else if (J.estado === 'rescate') Rescate.actualizar(dt);
   else if (J.estado === 'tarjeta') J.tiempo += dt;
   else if (J.estado === 'minijuego') { J.tiempo += dt; Minijuego.actualizar(dt); }
 
@@ -1122,12 +1212,15 @@ function bucle(ahora) {
 setInterval(() => {
   const inactivo = performance.now() - J.ultimaActividad;
   if (J.estado === 'final' && inactivo > 60000) irAlMenu();
-  if (['juego', 'tarjeta', 'minijuego', 'pausa'].includes(J.estado) && inactivo > 150000) irAlMenu();
+  if (['mision', 'juego', 'tarjeta', 'minijuego', 'pausa'].includes(J.estado) && inactivo > 150000) irAlMenu();
 }, 1000);
 
 // ============================================================== ARRANQUE
 Ranking.alCambiar(pintarRankings);
 Ranking.iniciar();
+pintarQR('qr-menu', 132);
+pintarQR('qr-final', 92);
+document.querySelectorAll('.url-juego').forEach(el => { el.textContent = CONFIG.urlPublica.replace('https://', ''); });
 cargarClima();
 setInterval(cargarClima, 10 * 60 * 1000);
 Sensores.prepararVoces();

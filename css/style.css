@@ -109,7 +109,7 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 6px; margin: 0 2px; b
 .titulo span { display: block; margin-top: 10px; font-size: 32px; color: var(--cian); letter-spacing: 0.02em; }
 .menu-botones { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 .menu-botones .btn-grande { width: 460px; }
-.menu-ranking { position: absolute; right: 40px; top: 110px; width: 380px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.menu-ranking { position: absolute; right: 40px; top: 84px; width: 380px; padding: 18px 22px; display: flex; flex-direction: column; gap: 8px; }
 .menu-ranking h2 { font-family: var(--f-titulo); font-size: 26px; }
 .menu-ranking .reto { margin-top: 6px; font-size: 14px; color: var(--ambar); font-style: italic; }
 .creditos { position: absolute; left: 56px; bottom: 22px; font-family: var(--f-mono); font-size: 12px; color: var(--texto-2); letter-spacing: 0.04em; }
@@ -283,13 +283,48 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 6px; margin: 0 2px; b
 .form-record input { flex: 1; min-width: 0; padding: 10px 12px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--borde); font-family: var(--f-mono); font-size: 15px; text-transform: uppercase; }
 .form-record input:focus { outline: none; border-color: var(--cian); }
 .ranking-final-titulo { margin-top: 6px; }
-#ranking-final li { font-size: 14px; padding: 7px 10px; }
+#ranking-final li { font-size: 13px; padding: 6px 10px; }
+
+/* ------------------------------------------- claridad: mapa y objetivo */
+.mapa { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.mapa span { opacity: 0.45; }
+.mapa span.hecha { opacity: 0.9; color: var(--verde); }
+.mapa span.actual { opacity: 1; color: var(--cian); }
+.mapa i { font-style: normal; opacity: 0.4; }
+.hud-objetivo { position: absolute; left: 50%; top: 68px; transform: translateX(-50%); max-width: 620px; display: flex; align-items: center; gap: 10px; padding: 9px 18px; background: rgba(0, 40, 48, 0.88); border: 1.5px solid var(--cian); border-radius: 4px; box-shadow: 0 0 18px rgba(0, 229, 255, 0.25); font-size: 19px; font-weight: 700; color: #fff; white-space: nowrap; }
+.hud-objetivo b { font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.12em; color: var(--cian); }
+.hud-objetivo.oculto { display: none; }
+.hud-objetivo.cambio { animation: objetivoNuevo 0.7s ease; }
+@keyframes objetivoNuevo { 0% { transform: translateX(-50%) scale(1.12); background: rgba(0, 229, 255, 0.45); } 100% { transform: translateX(-50%) scale(1); } }
+
+/* -------------------------------------------------- tarjeta de misión */
+.mision { width: 1080px; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; animation: entrar 0.35s ease; }
+.mision h2 { font-family: var(--f-titulo); font-size: 32px; }
+.mision-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 6px; }
+.mision-paso { position: relative; padding: 18px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--borde-suave); display: flex; flex-direction: column; gap: 8px; }
+.mision-paso .num { position: absolute; top: -12px; left: -12px; width: 30px; height: 30px; display: grid; place-items: center; background: var(--cian); color: #0f1417; font-family: var(--f-mono); font-weight: 700; }
+.mision-paso .ico { font-size: 40px; }
+.mision-paso h3 { font-family: var(--f-titulo); font-size: 21px; color: #fff; }
+.mision-paso p { font-size: 16px; line-height: 1.45; color: var(--texto-2); }
+.mision-mapa { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px; background: rgba(0, 0, 0, 0.3); font-family: var(--f-mono); font-size: 16px; font-weight: 700; }
+.mision-mapa i { font-style: normal; color: var(--cian); }
+.mision-ayuda { text-align: center; font-size: 15px; color: var(--texto-2); }
+.mision .btn { align-self: center; align-items: center; }
+
+/* ------------------------------------------- código QR (jugar en celular) */
+.menu-qr { position: absolute; right: 40px; bottom: 22px; width: 380px; padding: 14px; display: flex; gap: 14px; align-items: center; }
+.qr-caja { flex: none; padding: 6px; background: #fff; border-radius: 4px; line-height: 0; }
+.qr-titulo { font-size: 15px; line-height: 1.35; margin: 6px 0; color: #fff; }
+.url-juego { font-family: var(--f-mono); font-size: 10px; color: var(--texto-2); word-break: break-all; }
+.final-qr { display: flex; gap: 12px; align-items: center; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--borde-suave); font-size: 13px; line-height: 1.4; color: var(--texto-2); }
+.final-qr b { color: #fff; }
 
 /* ------------------------------------------------- controles táctiles */
 #tactil { display: none; position: absolute; left: 0; right: 0; bottom: 130px; padding: 0 20px; justify-content: space-between; pointer-events: none; z-index: 60; }
 #tactil div { display: flex; gap: 12px; pointer-events: auto; }
-#tactil button { width: 78px; height: 78px; border-radius: 50%; border: 2px solid rgba(0, 229, 255, 0.6); background: rgba(10, 15, 18, 0.55); font-size: 30px; color: #fff; touch-action: none; }
-#tactil button.grande { width: 96px; height: 96px; font-family: var(--f-mono); font-weight: 700; color: var(--cian); }
+#tactil button { width: 70px; height: 70px; border-radius: 50%; border: 2px solid rgba(0, 229, 255, 0.5); background: rgba(10, 15, 18, 0.28); font-size: 26px; color: #fff; touch-action: none; opacity: 0.85; }
+#tactil button:active { background: rgba(0, 229, 255, 0.35); }
+#tactil button.grande { width: 88px; height: 88px; font-family: var(--f-mono); font-weight: 700; color: var(--cian); }
 @media (pointer: coarse) { #tactil { display: flex; } }
 
 #girar { display: none; position: fixed; inset: 0; z-index: 999; background: #0f1417; color: var(--cian); align-items: center; justify-content: center; text-align: center; font-family: var(--f-mono); font-size: 22px; line-height: 2; }

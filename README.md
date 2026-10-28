@@ -7,7 +7,11 @@ Videojuego educativo (*serious game*) para la **Feria de la Ciencia y la Tecnolo
 🖨️ **Afiche con QR:** https://luismendoza04062011-ship-it.github.io/juego-naufrago/qr.html
 
 ## La historia
-Alek naufraga con el buque de investigación AURORA en una isla del Pacífico. Lo acompaña **BRISA**, una IA que escanea cada objeto que él recoge, le muestra **de qué átomos está hecho** y se lo explica **en voz alta**. Para ser rescatado debe cruzar la isla (playa → selva → campamento → cumbre), superar 3 retos científicos y encender la baliza S.O.S. antes de que su hidratación o su energía lleguen a 0.
+Alek naufraga con el buque de investigación AURORA en una isla del Pacífico. Lo acompaña **BRISA**, una IA que escanea cada objeto que él recoge, le muestra **de qué átomos está hecho** y se lo explica **en voz alta**. Para ser rescatado debe cruzar la isla (playa → selva → campamento → cumbre), superar 3 retos científicos y encender la baliza S.O.S. antes de que su hidratación o su energía lleguen a 0. Al final, un **helicóptero de rescate** llega a la cumbre y sube a Alek con un cable (escena animada dentro del juego).
+
+**Para que se entienda fácil:** al empezar aparece la tarjeta *Tu misión* (BRISA la lee en voz alta); arriba siempre se ve el **👉 objetivo** actual y el mapa de las 4 zonas, y una flecha cian señala a dónde ir.
+
+**📱 Jugar en el celular:** el menú y la pantalla final muestran un **código QR**; los visitantes lo escanean y juegan de una vez.
 
 ## Efecto WOW (sensores del navegador, sin comprar nada)
 | Sensor | Para qué se usa | API |
@@ -38,7 +42,7 @@ El micrófono y la voz necesitan `https` o `localhost` (no funcionan con doble c
 - Usar **Google Chrome** (Edge también sirve). Firefox no tiene reconocimiento de voz: el juego funciona igual con teclado.
 
 ## Firebase (ranking en la nube)
-El juego usa el proyecto `bogotaai` (el mismo de CiberRun). Si las reglas de Firestore están cerradas, el juego **no se rompe**: guarda los récords en este computador y muestra "Ranking local".
+El juego usa el proyecto de Firebase `naufrago-juego`. Si no hay internet o las reglas de Firestore están cerradas, el juego **no se rompe**: guarda los récords en ese computador.
 Para activar la nube: Firebase Console → Firestore Database → **Reglas** → pegar el contenido de [`firestore.rules`](firestore.rules) → **Publicar**.
 
 ## Estructura
@@ -46,13 +50,16 @@ Para activar la nube: Firebase Console → Firestore Database → **Reglas** →
 index.html        pantallas (menú, cinemática, sensores, juego, final)
 css/style.css     diseño "Scientific Survival HUD" (hecho en Google Stitch)
 js/data.js        TODO el contenido científico: objetos, átomos, moléculas, zonas, textos de BRISA
-js/game.js        motor Canvas 2D (60 FPS), personaje, zonas, HUD, inventario, supervivencia
+js/game.js        motor Canvas 2D (60 FPS), zonas, objetivo, HUD, inventario, supervivencia
+js/personajes.js  Alek (con articulaciones y poses), BRISA y el helicóptero, dibujados con Canvas
+js/rescate.js     escena animada del rescate en helicóptero
 js/minigames.js   los 3 retos científicos
 js/molecule.js    visor 3D de moléculas y modelo de Bohr
 js/sensors.js     micrófono, comandos de voz y voz de BRISA
 js/audio.js       efectos de sonido sintetizados (Web Audio, sin archivos)
 js/ranking.js     Firebase Firestore + respaldo local
 js/cinematic.js   cinemáticas narradas (ilustraciones de Stitch + efecto Ken Burns)
+js/lib/           QRCode.js (librería MIT para dibujar el código QR, copia local)
 assets/img/       ilustraciones exportadas de Google Stitch
 qr.html           afiche imprimible con el código QR
 ```

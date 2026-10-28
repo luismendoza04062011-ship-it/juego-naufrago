@@ -77,5 +77,41 @@ const Sonido = {
   puntos()   { this.tono(990, 0.07, 'square', 0.05); this.tono(1320, 0.1, 'square', 0.05, null, 0.06); },
   logro()    { [523, 659, 784, 1047].forEach((f, i) => this.tono(f, 0.22, 'triangle', 0.22, null, i * 0.09)); },
   victoria() { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tono(f, 0.4, 'triangle', 0.2, null, i * 0.12)); },
-  derrota()  { [392, 349, 311, 262].forEach((f, i) => this.tono(f, 0.45, 'triangle', 0.2, null, i * 0.32)); }
+  derrota()  { [392, 349, 311, 262].forEach((f, i) => this.tono(f, 0.45, 'triangle', 0.2, null, i * 0.32)); },
+
+  // Rotor del helicóptero: ruido grave que se "corta" 13 veces por segundo (tap-tap-tap)
+  rotor: null,
+  iniciarRotor() {
+    const ctx = this.ctx;
+    if (!ctx || this.rotor) return;
+    const fuente = ctx.createBufferSource();
+    fuente.buffer = this.bufferRuido;
+    fuente.loop = true;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = 'lowpass';
+    filtro.frequency.value = 380;
+    const pulso = ctx.createGain();
+    pulso.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 13;
+    const lfoGanancia = ctx.createGain();
+    lfoGanancia.gain.value = 0.5;
+    lfo.connect(lfoGanancia).connect(pulso.gain);
+    const volumen = ctx.createGain();
+    volumen.gain.value = 0;
+    fuente.connect(filtro).connect(pulso).connect(volumen).connect(this.maestro);
+    fuente.start();
+    lfo.start();
+    this.rotor = { fuente, lfo, volumen };
+  },
+  volumenRotor(v) {
+    if (this.rotor && !this.silenciado) this.rotor.volumen.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
+  },
+  detenerRotor() {
+    if (!this.rotor) return;
+    const r = this.rotor;
+    this.rotor = null;
+    r.volumen.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);
+    setTimeout(() => { try { r.fuente.stop(); r.lfo.stop(); } catch (e) { /* ya estaba detenido */ } }, 500);
+  }
 };

@@ -26,7 +26,10 @@ const CONFIG = {
     messagingSenderId: '667873125239',
     appId: '1:667873125239:web:935ac00bccb12976bab772'
   },
-  coleccionRanking: 'records_feria'
+  coleccionRanking: 'records_feria',
+
+  // Dirección pública del juego (la que abre el código QR)
+  urlPublica: 'https://luismendoza04062011-ship-it.github.io/juego-naufrago/'
 };
 
 // ---------------------------------------------------------------------
@@ -274,19 +277,19 @@ const OBJETOS = {
 // ---------------------------------------------------------------------
 const ZONAS = [
   {
-    id: 'playa', nombre: 'PLAYA AURORA', fondo: 'assets/img/zona_playa.jpg', suelo: 612, lluvia: true,
+    id: 'playa', nombre: 'PLAYA AURORA', corto: 'PLAYA', icono: '🏖️', hacia: 'la playa', fondo: 'assets/img/zona_playa.jpg', suelo: 612, lluvia: true,
     mision: 'Explora la playa y recoge los objetos útiles que dejó el naufragio.',
     intro: 'Estamos en la Playa Aurora. Busca los objetos que brillan en la arena, acércate y presiona E. Yo los escaneo y te digo de qué átomos están hechos.',
     objetos: [{ id: 'madera', x: 250 }, { id: 'coco', x: 470 }, { id: 'botella', x: 690 }, { id: 'pedernal', x: 900 }, { id: 'aguamar', x: 1110 }]
   },
   {
-    id: 'selva', nombre: 'SELVA PROFUNDA', fondo: 'assets/img/zona_selva.jpg', suelo: 628, lluvia: true, motas: true,
+    id: 'selva', nombre: 'SELVA PROFUNDA', corto: 'SELVA', icono: '🌴', hacia: 'la selva', fondo: 'assets/img/zona_selva.jpg', suelo: 628, lluvia: true, motas: true,
     mision: 'Cruza la selva y consigue materiales vegetales.',
     intro: 'Entramos a la selva. Aquí encontraremos fibras, hojas y frutas. Casi todos los seres vivos están hechos de los mismos tres elementos: carbono, hidrógeno y oxígeno.',
     objetos: [{ id: 'yesca', x: 260 }, { id: 'liana', x: 500 }, { id: 'fruta', x: 760 }, { id: 'hoja', x: 1010 }]
   },
   {
-    id: 'campamento', nombre: 'CAMPAMENTO', fondo: 'assets/img/zona_campamento.jpg', suelo: 618, lluvia: true,
+    id: 'campamento', nombre: 'CAMPAMENTO', corto: 'CAMPAMENTO', icono: '⛺', hacia: 'el campamento', fondo: 'assets/img/zona_campamento.jpg', suelo: 618, lluvia: true,
     mision: 'Consigue agua potable y prende el fuego.',
     intro: 'Este es un buen lugar para acampar. Primero consigamos agua potable con el destilador solar, a la izquierda. Después prendamos el fuego en el anillo de piedras, a la derecha.',
     objetos: [{ id: 'coco', x: 700 }],
@@ -296,7 +299,7 @@ const ZONAS = [
     ]
   },
   {
-    id: 'cumbre', nombre: 'CUMBRE DE LA ANTENA', fondo: 'assets/img/zona_cumbre.jpg', suelo: 632, lluvia: false, viento: true,
+    id: 'cumbre', nombre: 'CUMBRE DE LA ANTENA', corto: 'CUMBRE', icono: '📡', hacia: 'la cumbre', fondo: 'assets/img/zona_cumbre.jpg', suelo: 632, lluvia: false, viento: true,
     mision: 'Repara la baliza y envía la señal de auxilio.',
     intro: 'Llegamos a la cumbre. La baliza de emergencia no tiene energía. Busca la batería, el cable de cobre y la lámpara para repararla.',
     objetos: [{ id: 'lampara', x: 230 }, { id: 'bateria', x: 680 }, { id: 'magnetita', x: 860 }, { id: 'cobre', x: 1060 }],
@@ -317,12 +320,6 @@ const ESCENAS_INTRO = [
   { img: 'assets/img/menu.jpg', texto: 'Al amanecer, Alek despierta en la playa. Está solo, no tiene agua potable y se encuentra muy lejos de cualquier ruta de barcos.' },
   { img: 'assets/img/cine_brisa.jpg', texto: 'De pronto, su reloj se enciende: «Hola, Alek. Soy Brisa, tu asistente científica. Puedo escanear todo lo que encuentres y decirte de qué está hecho».' },
   { img: 'assets/img/zona_cumbre.jpg', texto: 'En la cumbre de la isla hay una antena de emergencia dañada. Para llegar hasta allá y pedir rescate, Alek necesitará agua, fuego y electricidad. En otras palabras: ciencia.' }
-];
-
-const ESCENAS_VICTORIA = [
-  { img: 'assets/img/cine_cumbre_luz.jpg', texto: 'La baliza se enciende y su luz empieza a parpadear: tres destellos cortos, tres largos y tres cortos. Es la señal internacional de socorro.' },
-  { img: 'assets/img/cine_baliza.jpg', texto: 'A doce millas náuticas, el buque de rescate Orión detecta la señal y pone rumbo hacia la isla.' },
-  { img: 'assets/img/cine_rescate.jpg', texto: 'Al atardecer, una lancha llega a la Playa Aurora. Alek está a salvo: sobrevivió gracias a la ciencia.' }
 ];
 
 const ESCENAS_DERROTA = {

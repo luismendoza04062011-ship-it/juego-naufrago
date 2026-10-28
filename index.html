@@ -43,6 +43,14 @@
       <ol class="ranking" id="ranking-menu"></ol>
       <p class="reto">Rector, profesores: ¿creen que pueden superar al mejor estudiante?</p>
     </aside>
+    <aside class="panel menu-qr">
+      <div class="qr-caja" id="qr-menu"></div>
+      <div>
+        <p class="eyebrow">📱 Juega en tu celular</p>
+        <p class="qr-titulo">Escanea el código con la cámara y juega de una vez</p>
+        <p class="url-juego"></p>
+      </div>
+    </aside>
     <footer class="creditos">Autor: <b>Luis Alejandro Mendoza Camacho</b> · Grado 10-01 · Colegio Carlos Vicente Rey</footer>
   </section>
 
@@ -123,10 +131,11 @@
         <span class="chip" id="hud-clima">☁️ —</span>
       </div>
       <div class="panel hud-centro">
-        <span id="hud-zona">ZONA 1/4</span><i class="sep"></i>
+        <span id="hud-mapa" class="mapa"></span><i class="sep"></i>
         <span id="hud-tiempo">⏱ 00:00</span><i class="sep"></i>
         <span id="hud-puntos">★ 0</span>
       </div>
+      <div class="hud-objetivo" id="hud-objetivo"><b>👉 OBJETIVO</b><span></span></div>
       <div class="panel hud-mision">
         <p class="eyebrow">⚑ Misión científica</p>
         <p id="hud-mision-texto"></p>
@@ -207,6 +216,36 @@
       </div>
     </div>
 
+    <!-- Tu misión (al empezar cada partida) -->
+    <div id="ov-mision" class="overlay">
+      <div class="panel mision">
+        <p class="eyebrow">Antes de empezar</p>
+        <h2>TU MISIÓN: LLEGAR A LA CUMBRE Y PEDIR RESCATE</h2>
+        <div class="mision-pasos">
+          <div class="mision-paso">
+            <span class="num">1</span><span class="ico">🔍</span>
+            <h3>Recoge objetos</h3>
+            <p>Acércate a lo que brilla y presiona <kbd>E</kbd>. BRISA te muestra sus átomos y te explica para qué sirve.</p>
+          </div>
+          <div class="mision-paso">
+            <span class="num">2</span><span class="ico">🧪</span>
+            <h3>Supera 3 retos</h3>
+            <p>💧 Agua con el destilador solar · 🔥 Fuego soplando al micrófono · 📡 Electricidad para la baliza.</p>
+          </div>
+          <div class="mision-paso">
+            <span class="num">3</span><span class="ico">❤️</span>
+            <h3>No te quedes sin agua ni energía</h3>
+            <p>Si una barra llega a 0, pierdes. Usa <kbd>1</kbd> para el coco y <kbd>2</kbd> para la guayaba.</p>
+          </div>
+        </div>
+        <div class="mision-mapa">
+          <span>🏖️ Playa</span><i>→</i><span>🌴 Selva</span><i>→</i><span>⛺ Campamento</span><i>→</i><span>📡 Cumbre</span><i>→</i><span>🚁 ¡Rescate!</span>
+        </div>
+        <p class="mision-ayuda">Arriba siempre verás tu <b>👉 objetivo</b>, y una flecha cian te señala a dónde ir.</p>
+        <button class="btn btn-primario btn-grande" id="btn-empezar">¡VAMOS! [E]</button>
+      </div>
+    </div>
+
     <!-- Pausa -->
     <div id="ov-pausa" class="overlay">
       <div class="panel caja-pausa">
@@ -255,6 +294,10 @@
           <p class="estado" id="record-estado"></p>
           <p class="eyebrow" id="ranking-estado-final">Top 5 de la feria</p>
           <ol class="ranking" id="ranking-final"></ol>
+          <div class="final-qr">
+            <div class="qr-caja" id="qr-final"></div>
+            <p><b>📱 ¿Quieres jugar en tu celular?</b><br>Escanea este código y juega de una vez.</p>
+          </div>
         </div>
       </div>
       <div class="fila centro">
@@ -308,6 +351,9 @@
 <script src="js/molecule.js"></script>
 <script src="js/cinematic.js"></script>
 <script src="js/minigames.js"></script>
+<script src="js/lib/qrcode.min.js"></script>
+<script src="js/personajes.js"></script>
+<script src="js/rescate.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>
